@@ -1,0 +1,322 @@
+<title>OTT Release Radar Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a broadcast-schedule style rundown. Each pipeline stage is one row: our module on the left, the outside service it talks to on the right. */
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --ink: #141823;
+  --muted: #5a6175;
+  --line: #d5d9e3;
+  --accent: #c2410c;          /* "on air" signal orange */
+  --accent-soft: #fde7da;
+  --ext: #2f4b8a;             /* external services */
+  --ext-soft: #e3e9f7;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10131a; --surface: #181c25; --ink: #e8eaf0; --muted: #9aa1b4; --line: #2b3140;
+    --accent: #fb8a4a; --accent-soft: #3a2116; --ext: #9bb4ee; --ext-soft: #1c2640;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10131a; --surface: #181c25; --ink: #e8eaf0; --muted: #9aa1b4; --line: #2b3140;
+  --accent: #fb8a4a; --accent-soft: #3a2116; --ext: #9bb4ee; --ext-soft: #1c2640;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 40px 64px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 48px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; font-stretch: 80%; letter-spacing: -0.01em; line-height: 1.05; }
+h2 { font-size: 1.35rem; font-weight: 700; font-stretch: 85%; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.84em; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: grid; gap: 14px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { max-width: 64ch; color: var(--muted); font-size: 1.05rem; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; }
+.links span { color: var(--muted); }
+
+section { display: grid; gap: 18px; }
+.section-head { display: grid; gap: 6px; }
+.section-head p { color: var(--muted); max-width: 70ch; }
+
+/* Rundown */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend .k-int { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+.legend .k-ext { background: var(--ext-soft); border: 1.5px dashed var(--ext); }
+
+.rundown { display: grid; gap: 0; }
+.stage {
+  display: grid; grid-template-columns: 92px minmax(0, 1fr) 40px minmax(0, 0.8fr);
+  align-items: stretch; position: relative;
+}
+.stage + .stage { margin-top: 14px; }
+.slot {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  padding-top: 14px; display: grid; align-content: start; gap: 2px;
+}
+.slot b { font-family: var(--font-display); font-size: 22px; font-weight: 800; font-stretch: 80%; color: var(--accent); line-height: 1; }
+.node { padding: 14px 16px; border-radius: 8px; display: grid; gap: 6px; min-width: 0; }
+.node h3 { margin: 0; font-family: var(--font-display); font-weight: 700; font-stretch: 90%; font-size: 1.05rem; }
+.node .file { font-family: var(--font-mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.node ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 14px; }
+.int { background: var(--surface); border: 1.5px solid var(--accent); }
+.ext { background: var(--ext-soft); border: 1.5px dashed var(--ext); }
+.ext h3 { color: var(--ext); }
+.wire { position: relative; }
+.wire::before { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; border-top: 1.5px solid var(--line); }
+.wire::after {
+  content: ""; position: absolute; right: 4px; top: calc(50% - 4px);
+  border-left: 7px solid var(--line); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+}
+.wire.none::before, .wire.none::after { display: none; }
+.empty { border: 1.5px dashed transparent; }
+.down {
+  grid-column: 2; height: 14px; margin-left: 24px; border-left: 1.5px solid var(--line);
+}
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 620px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; font-size: 14px; }
+.note h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.note p { color: var(--muted); }
+
+@media (max-width: 760px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .slot { padding-top: 0; grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 10px; }
+  .wire { height: 18px; }
+  .wire::before { left: 24px; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 1.5px solid var(--line); }
+  .wire::after { left: 20px; right: auto; top: auto; bottom: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 7px solid var(--line); border-bottom: 0; }
+  .wire.none, .empty { display: none; }
+  .ext { margin-left: 24px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">MESA Cohort C4 · Problem Statement 11 · Components Map</div>
+    <h1>OTT Release Radar</h1>
+    <p class="lede">Every Friday at 7:00 PM IST, this app finds the shows and films that released in India in the last seven days on Netflix, Prime Video and JioHotstar, keeps the ones that match Naman's genres and languages, asks Gemini Flash whether each is worth watching, and sends the digest to Telegram.</p>
+    <div class="links">
+      <a href="https://github.com/sanjanapundir-ai/ott-release-radar">GitHub repository</a>
+      <span>Stack: Next.js 16 · Vercel Cron · TMDB · Gemini Flash · Telegram Bot API</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="flow">
+    <div class="section-head">
+      <h2 id="flow">Pipeline</h2>
+      <p>One run of <code>GET /api/digest</code>, top to bottom. Solid boxes are modules in this repo; dashed boxes are the outside services they call.</p>
+    </div>
+    <div class="legend"><span><i class="k-int"></i>Module in this repo</span><span><i class="k-ext"></i>External service</span></div>
+
+    <div class="rundown">
+      <div class="stage">
+        <div class="slot"><b>1</b>Trigger</div>
+        <div class="node int">
+          <h3>Digest API route</h3>
+          <div class="file">src/app/api/digest/route.ts · vercel.json</div>
+          <ul>
+            <li>Runs on cron <code>30 13 * * 5</code> (Friday 13:30 UTC = 7:00 PM IST)</li>
+            <li>Cron calls carry <code>Bearer CRON_SECRET</code>; the homepage uses <code>?manual=true</code></li>
+            <li><code>?send=false</code> returns the digest as JSON without messaging Telegram</li>
+          </ul>
+        </div>
+        <div class="wire" aria-hidden="true"></div>
+        <div class="node ext">
+          <h3>Vercel Cron + Functions</h3>
+          <ul><li>Hosts the app and fires the weekly schedule</li><li>Function limit set to 120 s</li></ul>
+        </div>
+      </div>
+      <div class="stage"><div></div><div class="down" aria-hidden="true"></div></div>
+
+      <div class="stage">
+        <div class="slot"><b>2</b>Profile</div>
+        <div class="node int">
+          <h3>Preference profile</h3>
+          <div class="file">src/lib/preferences.ts</div>
+          <ul>
+            <li>Languages: Hindi <code>hi</code>, English <code>en</code>, Tamil <code>ta</code></li>
+            <li>Movie genres: Thriller 53, Sci-Fi 878, Drama 18</li>
+            <li>TV genres: Crime 80, Mystery 9648, Sci-Fi &amp; Fantasy 10765, Drama 18 (TMDB has no TV Thriller)</li>
+            <li>Platforms matched by name, so a renamed or re-numbered provider is still found</li>
+          </ul>
+        </div>
+        <div class="wire none" aria-hidden="true"></div>
+        <div class="empty"></div>
+      </div>
+      <div class="stage"><div></div><div class="down" aria-hidden="true"></div></div>
+
+      <div class="stage">
+        <div class="slot"><b>3</b>Fetch</div>
+        <div class="node int">
+          <h3>Release fetcher and filter</h3>
+          <div class="file">src/lib/tmdb.ts</div>
+          <ul>
+            <li>Resolves India provider IDs for the three platforms</li>
+            <li>Movies: digital release (type 4) in India in the last 7 days</li>
+            <li>TV: brand-new shows, or shows whose new season started in the window</li>
+            <li>Filters by language, genre and subscription platform; keeps the 12 most popular</li>
+            <li>Adds runtime or episode count, genre names and the exact platform per title</li>
+          </ul>
+        </div>
+        <div class="wire" aria-hidden="true"></div>
+        <div class="node ext">
+          <h3>TMDB API v3</h3>
+          <ul>
+            <li><code>/watch/providers</code> (region IN)</li>
+            <li><code>/discover/movie</code>, <code>/discover/tv</code></li>
+            <li><code>/{type}/{id}</code>, <code>/{type}/{id}/watch/providers</code></li>
+            <li><code>/genre/*/list</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="stage"><div></div><div class="down" aria-hidden="true"></div></div>
+
+      <div class="stage">
+        <div class="slot"><b>4</b>Judge</div>
+        <div class="node int">
+          <h3>Watch-or-skip recommender</h3>
+          <div class="file">src/lib/gemini.ts</div>
+          <ul>
+            <li>One batched prompt with the profile and all candidate titles</li>
+            <li>Structured JSON back: verdict, 0–100 match score, two-line synopsis, one-line reason</li>
+            <li>Each call is capped at 15 s, then falls back to the next Flash model</li>
+          </ul>
+        </div>
+        <div class="wire" aria-hidden="true"></div>
+        <div class="node ext">
+          <h3>Gemini Flash</h3>
+          <ul>
+            <li><code>gemini-flash-latest</code></li>
+            <li>Fallbacks: <code>gemini-3.5-flash</code>, <code>gemini-flash-lite-latest</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="stage"><div></div><div class="down" aria-hidden="true"></div></div>
+
+      <div class="stage">
+        <div class="slot"><b>5</b>Compose</div>
+        <div class="node int">
+          <h3>Digest builder</h3>
+          <div class="file">src/lib/digest.ts</div>
+          <ul>
+            <li>Joins TMDB data with Gemini verdicts and sorts by match score</li>
+            <li>If Gemini is unavailable, the digest still goes out without verdicts</li>
+            <li>Sends a "nothing new this week" note when no title matches</li>
+          </ul>
+        </div>
+        <div class="wire none" aria-hidden="true"></div>
+        <div class="empty"></div>
+      </div>
+      <div class="stage"><div></div><div class="down" aria-hidden="true"></div></div>
+
+      <div class="stage">
+        <div class="slot"><b>6</b>Deliver</div>
+        <div class="node int">
+          <h3>Telegram sender</h3>
+          <div class="file">src/lib/telegram.ts</div>
+          <ul>
+            <li>HTML formatting with escaped titles</li>
+            <li>Splits between entries to stay under Telegram's 4,096-character limit</li>
+            <li>Fails the run loudly if Telegram rejects a message</li>
+          </ul>
+        </div>
+        <div class="wire" aria-hidden="true"></div>
+        <div class="node ext">
+          <h3>Telegram Bot API</h3>
+          <ul><li><code>sendMessage</code> to Naman's chat via @Moodymovies_bot</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ui">
+    <div class="section-head">
+      <h2 id="ui">Web page</h2>
+      <p><code>src/app/page.tsx</code> is the public homepage. It shows the profile and schedule and has two buttons that call the same API route, so the pipeline can be checked with live data at any time without waiting for Friday.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Button</th><th>Request</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Preview This Week</td><td><code>/api/digest?manual=true&amp;send=false</code></td><td>Lists this week's matches with verdicts on the page</td></tr>
+          <tr><td>Send Digest Now</td><td><code>/api/digest?manual=true</code></td><td>Runs the full pipeline and messages Telegram</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="fields">
+    <div class="section-head">
+      <h2 id="fields">Where each digest field comes from</h2>
+      <p>The problem statement asks for six fields per title.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Field</th><th>Source</th><th>Component</th></tr></thead>
+        <tbody>
+          <tr><td>Title</td><td>TMDB discover results</td><td>tmdb.ts</td></tr>
+          <tr><td>Platform</td><td>TMDB watch providers for India, subscription only</td><td>tmdb.ts</td></tr>
+          <tr><td>Genre tags</td><td>TMDB genre list, mapped from genre IDs</td><td>tmdb.ts</td></tr>
+          <tr><td>Runtime or episodes</td><td>TMDB movie or TV details</td><td>tmdb.ts</td></tr>
+          <tr><td>Two-line synopsis</td><td>Gemini Flash, falling back to the TMDB overview</td><td>gemini.ts</td></tr>
+          <tr><td>Watch or skip</td><td>Gemini Flash verdict with match score and reason</td><td>gemini.ts</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="config">
+    <div class="section-head">
+      <h2 id="config">Configuration</h2>
+      <p>Set as Vercel environment variables. Values are never committed; <code>.env.example</code> lists them.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Used by</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">TMDB_API_KEY</td><td>tmdb.ts</td><td>Live release data</td></tr>
+          <tr><td class="mono">GEMINI_API_KEY</td><td>gemini.ts</td><td>Recommendations</td></tr>
+          <tr><td class="mono">GEMINI_MODEL</td><td>gemini.ts</td><td>Optional model override</td></tr>
+          <tr><td class="mono">TELEGRAM_BOT_TOKEN</td><td>telegram.ts</td><td>Bot that sends the digest</td></tr>
+          <tr><td class="mono">TELEGRAM_CHAT_ID</td><td>telegram.ts</td><td>Naman's chat</td></tr>
+          <tr><td class="mono">CRON_SECRET</td><td>route.ts</td><td>Confirms scheduled calls come from Vercel Cron</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="limits">
+    <div class="section-head"><h2 id="limits">Known limits</h2></div>
+    <div class="notes">
+      <div class="note"><h3>OTT arrival dates</h3><p>TMDB records release dates and current platforms, not the day a title was added to a platform. An older film newly added to Netflix India may be missed.</p></div>
+      <div class="note"><h3>"Indie" drama</h3><p>TMDB has no indie genre, so any Drama passes the filter and Gemini judges how well it fits an indie taste.</p></div>
+      <div class="note"><h3>Open manual trigger</h3><p>The homepage buttons need no login so graders can run it. Anyone with the URL can trigger a send.</p></div>
+    </div>
+  </section>
+</div>
