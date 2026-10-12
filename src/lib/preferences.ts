@@ -27,7 +27,7 @@ export const namanPreferences: UserPreferences = {
   },
   platforms: [
     { label: "Netflix", match: /^netflix$/i },
-    { label: "Amazon Prime Video", match: /^amazon prime video$/i },
+    { label: "Amazon Prime Video", match: /^(amazon )?prime video$/i },
     { label: "JioHotstar", match: /hotstar/i },
   ],
 };

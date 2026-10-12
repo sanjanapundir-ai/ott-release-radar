@@ -6,6 +6,8 @@ export interface DigestEntry extends OTTMediaItem {
   recommendation?: Recommendation;
 }
 
+const DIGEST_SIZE = 12;
+
 export async function buildDigest(): Promise<DigestEntry[]> {
   const items = await fetchWeeklyNewReleases();
   const recs = await getGeminiRecommendations(items).catch((err) => {
@@ -14,7 +16,8 @@ export async function buildDigest(): Promise<DigestEntry[]> {
   });
   return items
     .map((item) => ({ ...item, recommendation: recs.get(item.key) }))
-    .sort((a, b) => (b.recommendation?.matchScore ?? 0) - (a.recommendation?.matchScore ?? 0));
+    .sort((a, b) => (b.recommendation?.matchScore ?? 0) - (a.recommendation?.matchScore ?? 0))
+    .slice(0, DIGEST_SIZE);
 }
 
 function formatEntry(e: DigestEntry): string {

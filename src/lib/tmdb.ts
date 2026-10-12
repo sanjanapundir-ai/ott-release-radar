@@ -23,7 +23,8 @@ export interface OTTMediaItem {
 }
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const MAX_ITEMS = 12;
+const MAX_ITEMS = 12; // TMDB discover results taken per type
+const POOL_PER_SOURCE = 10; // candidates per source sent to Gemini
 const MAX_ARRIVALS = 60;
 
 async function tmdb<T>(path: string, params: Record<string, string> = {}): Promise<T> {
@@ -214,13 +215,11 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
     })
   );
 
-  // Titles confirmed as added to a platform this week come first, then by popularity.
-  return enriched
-    .filter((e) => e !== null)
-    .sort(
-      (a, b) =>
-        Number(b.item.verifiedArrival) - Number(a.item.verifiedArrival) || b.popularity - a.popularity
-    )
-    .slice(0, MAX_ITEMS)
+  // Build the pool Gemini judges from both sources, so popular TMDB titles can't crowd
+  // out platform arrivals (which include older catalogue titles with lower popularity).
+  const kept = enriched.filter((e) => e !== null).sort((a, b) => b.popularity - a.popularity);
+  const verified = kept.filter((e) => e.item.verifiedArrival).slice(0, POOL_PER_SOURCE);
+  const tmdbOnly = kept.filter((e) => !e.item.verifiedArrival).slice(0, POOL_PER_SOURCE);
+  return [...verified, ...tmdbOnly]
     .map((e) => e.item);
 }

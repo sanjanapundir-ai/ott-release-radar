@@ -93,6 +93,7 @@ async function fetchChanges(
       catalogs,
       from: String(from),
       to: String(to),
+      order_direction: "desc", // newest first, so the page cap keeps the latest arrivals
       ...(cursor ? { cursor } : {}),
     });
     pages.push(page);
