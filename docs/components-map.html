@@ -1,174 +1,134 @@
 <title>OTT Release Radar Components</title>
 <style>
-/* Layout: business view. One Input → Process → Output diagram, then three value cards. Plain language, no file names. */
+/* Layout: swimlane matrix. Rows are actors, columns are stages (Trigger → Output); dashed arrows trace one weekly run. Deliberately a single light look, like a printed handout. */
 :root {
-  --bg: #f4f4f6;
-  --card: #ffffff;
-  --ink: #1d1d22;
-  --muted: #55555f;
-  --edge: #8a8a92;
-  --band: #f7f7f9;
-  --in-fill: #e7f4ee;   --in-line: #4f9a80;   --in-ink: #1f5c47;
-  --pr-fill: #eeedfc;   --pr-line: #6b5bd6;   --pr-ink: #3b2fa0;
-  --out-fill: #fbebe6;  --out-line: #b5533c;  --out-ink: #7a2a17;
+  color-scheme: light;
+  --page: #ffffff;
+  --navy: #14233f;
+  --ink: #1b2233;
+  --grid: #ffffff;
+  --edge: #22324f;
+  --lane-user: #e8f0fd; --lane-sys: #fdf8e3; --lane-data: #e9f7ee; --lane-ai: #fdeaf3; --lane-msg: #efeefb;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e; --band: #202026;
-    --in-fill: #16302a;  --in-line: #5fb497;  --in-ink: #a9e2cd;
-    --pr-fill: #24213f;  --pr-line: #8f82ea;  --pr-ink: #c9c2ff;
-    --out-fill: #3a1f18; --out-line: #d27a62; --out-ink: #f5c3b4;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e; --band: #202026;
-  --in-fill: #16302a;  --in-line: #5fb497;  --in-ink: #a9e2cd;
-  --pr-fill: #24213f;  --pr-line: #8f82ea;  --pr-ink: #c9c2ff;
-  --out-fill: #3a1f18; --out-line: #d27a62; --out-ink: #f5c3b4;
-  color-scheme: dark;
-}
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font); padding-inline: 16px; padding-block: 32px 48px; }
-.sheet { max-width: 1240px; margin: 0 auto; background: var(--card); border-radius: 18px; padding: 32px 28px 28px; display: grid; gap: 22px; }
-header { display: grid; gap: 6px; }
-h1 { margin: 0; font-size: clamp(1.5rem, 3.4vw, 2rem); font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
-.sub { margin: 0; color: var(--muted); font-size: 15px; max-width: 75ch; line-height: 1.5; }
-.links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
-.links a { color: var(--pr-ink); text-underline-offset: 3px; }
+body { background: var(--page); color: var(--ink); font-family: var(--font); padding-inline: 16px; padding-block: 28px 40px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { margin: 0; text-align: center; color: var(--navy); font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 750; letter-spacing: -0.01em; text-wrap: balance; }
+.links { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
+.links a { color: #2b4fb3; text-underline-offset: 3px; }
 .diagram { overflow-x: auto; }
-svg { display: block; width: 100%; min-width: 900px; height: auto; font-family: var(--font); }
+svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: var(--font); }
 
-.band rect { fill: var(--band); }
-.band text { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; fill: var(--muted); }
-.n rect { stroke-width: 1.8; }
-.n .t { font-size: 19px; font-weight: 650; }
-.n .s { font-size: 15px; }
-.in rect  { fill: var(--in-fill);  stroke: var(--in-line); }  .in text  { fill: var(--in-ink); }
-.pr rect  { fill: var(--pr-fill);  stroke: var(--pr-line); }  .pr text  { fill: var(--pr-ink); }
-.out rect { fill: var(--out-fill); stroke: var(--out-line); } .out text { fill: var(--out-ink); }
-.e { fill: none; stroke: var(--edge); stroke-width: 1.8; }
+.hdr { fill: var(--navy); }
+.hdr-t { fill: #fff; font-size: 21px; font-weight: 600; text-anchor: middle; }
+.actor-t { fill: #fff; font-size: 21px; font-weight: 700; text-anchor: middle; }
+.actor-s { fill: #c9d3e6; font-size: 16px; text-anchor: middle; }
+.lane-user { fill: var(--lane-user); } .lane-sys { fill: var(--lane-sys); } .lane-data { fill: var(--lane-data); }
+.lane-ai { fill: var(--lane-ai); } .lane-msg { fill: var(--lane-msg); }
+.col { stroke: var(--grid); stroke-width: 2; }
+.e { fill: none; stroke: var(--edge); stroke-width: 1.8; stroke-dasharray: 6 5; }
 .ah { fill: var(--edge); }
 
-.value { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-.value div { border: 1px solid color-mix(in srgb, var(--edge) 45%, transparent); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
-.value h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.value p { margin: 0; font-size: 15px; line-height: 1.5; }
+.box { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 8px 10px; border: 2px solid; border-radius: 10px; font-size: 16px; line-height: 1.32; color: var(--ink); }
+.box small { display: block; font-size: 14px; margin-top: 3px; color: #3d465a; }
+.trig { background: #e3e2fb; border-color: #4f46e5; }
+.inp  { background: #e3edfd; border-color: #2f6fe0; }
+.ctx  { background: #dcf5e4; border-color: #2e9d58; }
+.proc { background: #fdedc6; border-color: #e09a1b; }
+.ai   { background: #fbdcec; border-color: #d6338a; }
+.msg  { background: #e3edfd; border-color: #2f6fe0; }
+.out  { background: #fde4e0; border-color: #e0483a; }
 
 @media print {
-  @page { size: 1300px 815px; margin: 0; }
-  body { padding-block: 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: 1320px 885px; margin: 0; }
+  body { padding-block: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   svg { min-width: 0; }
 }
 </style>
 
-<div class="sheet">
-  <header>
-    <h1>OTT Release Radar — how it works</h1>
-    <p class="sub">Every Friday evening, Naman gets one Telegram message listing what's new this week on Netflix, Prime Video and JioHotstar in India, filtered to his tastes, with an AI watch-or-skip call on each title.</p>
-    <div class="links"><a href="https://ott-release-radar-theta.vercel.app">Live app</a><a href="https://github.com/sanjanapundir-ai/ott-release-radar">GitHub repository</a></div>
-  </header>
+<div class="wrap">
+  <h1>Problem 11 · OTT Release Radar — Components Map</h1>
+  <div class="links"><a href="https://ott-release-radar-theta.vercel.app">Live app</a><a href="https://github.com/sanjanapundir-ai/ott-release-radar">GitHub repository</a></div>
 
   <div class="diagram">
-  <svg viewBox="0 0 1600 560" role="img" aria-label="Inputs: a weekly schedule, Naman's taste profile and live release data feed a find-and-filter step, then an AI curator using Gemini Flash. Outputs: a Friday Telegram digest and a website preview.">
+  <svg viewBox="0 0 1620 960" role="img" aria-label="Swimlane map. Naman or the Friday scheduler triggers a run. The system takes Naman's taste profile, pulls live release data from TMDB and RapidAPI, filters it, and Gemini Flash gives watch or skip verdicts. The Telegram bot sends the digest, which Naman receives as the output.">
     <defs>
       <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path class="ah" d="M0 0 L10 5 L0 10 z"/>
       </marker>
     </defs>
 
-    <!-- Bands -->
-    <g class="band">
-      <rect x="20" y="10" width="500" height="540" rx="16"/>
-      <rect x="560" y="10" width="580" height="540" rx="16"/>
-      <rect x="1180" y="10" width="400" height="540" rx="16"/>
-      <text x="48" y="46">INPUTS</text>
-      <text x="588" y="46">PROCESS</text>
-      <text x="1208" y="46">OUTPUT</text>
-    </g>
+    <!-- Lanes -->
+    <rect class="lane-user" x="220" y="92"  width="1380" height="170"/>
+    <rect class="lane-sys"  x="220" y="262" width="1380" height="170"/>
+    <rect class="lane-data" x="220" y="432" width="1380" height="170"/>
+    <rect class="lane-ai"   x="220" y="602" width="1380" height="170"/>
+    <rect class="lane-msg"  x="220" y="772" width="1380" height="170"/>
+    <path class="col" d="M450 92 V942 M680 92 V942 M910 92 V942 M1140 92 V942 M1370 92 V942 M220 262 H1600 M220 432 H1600 M220 602 H1600 M220 772 H1600"/>
 
-    <!-- Inputs -->
-    <g class="n in">
-      <rect x="48" y="74" width="420" height="100" rx="12"/>
-      <text class="t" x="72" y="112">Weekly schedule</text>
-      <text class="s" x="72" y="142">Every Friday at 7 PM IST, or on demand</text>
-    </g>
-    <g class="n in">
-      <rect x="48" y="200" width="420" height="140" rx="12"/>
-      <text class="t" x="72" y="238">Naman's taste profile</text>
-      <text class="s" x="72" y="268">Thriller · Sci-Fi · Indie Drama</text>
-      <text class="s" x="72" y="294">Hindi · English · Tamil</text>
-      <text class="s" x="72" y="320">Netflix · Prime Video · JioHotstar</text>
-    </g>
-    <g class="n in">
-      <rect x="48" y="366" width="420" height="160" rx="12"/>
-      <text class="t" x="72" y="404">Live release data</text>
-      <text class="s" x="72" y="434">TMDB: what released in India</text>
-      <text class="s" x="72" y="460">Streaming Availability (RapidAPI):</text>
-      <text class="s" x="72" y="486">what landed on each platform</text>
-      <text class="s" x="72" y="512">this week</text>
-    </g>
+    <!-- Header row -->
+    <rect class="hdr" x="20" y="20" width="1580" height="72" rx="10"/>
+    <rect class="hdr" x="20" y="60" width="1580" height="32"/>
+    <text class="hdr-t" x="120"  y="64">Actor</text>
+    <text class="hdr-t" x="335"  y="64">Trigger</text>
+    <text class="hdr-t" x="565"  y="64">Input</text>
+    <text class="hdr-t" x="795"  y="64">Context</text>
+    <text class="hdr-t" x="1025" y="64">Processing</text>
+    <text class="hdr-t" x="1255" y="64">AI</text>
+    <text class="hdr-t" x="1485" y="64">Output</text>
+    <path d="M220 28 V84 M450 28 V84 M680 28 V84 M910 28 V84 M1140 28 V84 M1370 28 V84" stroke="#2c3d5e" stroke-width="1.5"/>
 
-    <path class="e" d="M468 124 H520 V250" />
-    <path class="e" d="M468 270 H590" marker-end="url(#ah)"/>
-    <path class="e" d="M468 446 H520 V290" />
+    <!-- Actor column -->
+    <rect class="hdr" x="20" y="92" width="200" height="850"/>
+    <rect class="hdr" x="20" y="902" width="200" height="40" rx="10"/>
+    <path d="M20 262 H220 M20 432 H220 M20 602 H220 M20 772 H220" stroke="#2c3d5e" stroke-width="1.5"/>
+    <text class="actor-t" x="120" y="172">Naman</text>
+    <text class="actor-s" x="120" y="198">(User)</text>
+    <text class="actor-t" x="120" y="342">System</text>
+    <text class="actor-s" x="120" y="368">(App on Vercel)</text>
+    <text class="actor-t" x="120" y="512">Data APIs</text>
+    <text class="actor-s" x="120" y="538">(TMDB + RapidAPI)</text>
+    <text class="actor-t" x="120" y="682">AI Model</text>
+    <text class="actor-s" x="120" y="708">(Gemini Flash)</text>
+    <text class="actor-t" x="120" y="852">Messaging</text>
+    <text class="actor-s" x="120" y="878">(Telegram Bot)</text>
 
-    <!-- Process -->
-    <g class="n pr">
-      <rect x="592" y="74" width="516" height="196" rx="12"/>
-      <text class="t" x="618" y="112">1. Find and filter</text>
-      <text class="s" x="618" y="144">Released in the last 7 days</text>
-      <text class="s" x="618" y="170">Recent titles only, no old catalogue</text>
-      <text class="s" x="618" y="196">Matches his genres and languages</text>
-      <text class="s" x="618" y="222">Series: new shows, or new seasons of</text>
-      <text class="s" x="618" y="246">shows that are still running</text>
-    </g>
-    <path class="e" d="M850 270 V310" marker-end="url(#ah)"/>
-    <g class="n pr">
-      <rect x="592" y="312" width="516" height="214" rx="12"/>
-      <text class="t" x="618" y="350">2. AI curator (Gemini Flash)</text>
-      <text class="s" x="618" y="382">Compares each title with his profile</text>
-      <text class="s" x="618" y="408">Uses critic rating, cast and director</text>
-      <text class="s" x="618" y="434">Gives WATCH or SKIP with a 0–100 score</text>
-      <text class="s" x="618" y="460">Writes a two-line synopsis and a</text>
-      <text class="s" x="618" y="484">one-line reason</text>
-    </g>
+    <!-- Arrows (drawn under the boxes) -->
+    <path class="e" d="M435 177 H450 V310 H463" marker-end="url(#ah)"/>
+    <path class="e" d="M435 347 H463" marker-end="url(#ah)"/>
+    <path class="e" d="M665 347 H680 V517 H693" marker-end="url(#ah)"/>
+    <path class="e" d="M895 517 H910 V347 H923" marker-end="url(#ah)"/>
+    <path class="e" d="M1125 347 H1255 V615" marker-end="url(#ah)"/>
+    <path class="e" d="M1255 757 V857 H1383" marker-end="url(#ah)"/>
+    <path class="e" d="M1485 797 V259" marker-end="url(#ah)"/>
 
-    <path class="e" d="M1108 380 H1150 V176 H1206" marker-end="url(#ah)"/>
-    <path class="e" d="M1150 380 V438 H1206" marker-end="url(#ah)"/>
-
-    <!-- Output -->
-    <g class="n out">
-      <rect x="1208" y="74" width="344" height="222" rx="12"/>
-      <text class="t" x="1232" y="112">Friday Telegram digest</text>
-      <text class="s" x="1232" y="144">Up to 12 picks, best first</text>
-      <text class="s" x="1232" y="170">Platform · runtime · genres</text>
-      <text class="s" x="1232" y="196">Synopsis and verdict</text>
-      <text class="s" x="1232" y="222">Link to open it in the app</text>
-      <text class="s" x="1232" y="260">Delivered to Naman's chat</text>
-    </g>
-    <g class="n out">
-      <rect x="1208" y="380" width="344" height="146" rx="12"/>
-      <text class="t" x="1232" y="418">Website preview</text>
-      <text class="s" x="1232" y="450">See this week's picks any time</text>
-      <text class="s" x="1232" y="476">or send the digest now</text>
-    </g>
+    <!-- Boxes -->
+    <foreignObject x="235" y="117" width="200" height="120">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box trig">Opens the website and clicks Preview or Send Now (any time)</div>
+    </foreignObject>
+    <foreignObject x="235" y="287" width="200" height="120">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box trig">Scheduler fires every Friday at 7 PM IST</div>
+    </foreignObject>
+    <foreignObject x="465" y="277" width="200" height="140">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box inp"><span>Naman's taste profile<small>Thriller, Sci-Fi, Indie Drama · Hindi, English, Tamil · Netflix, Prime, JioHotstar</small></span></div>
+    </foreignObject>
+    <foreignObject x="695" y="447" width="200" height="140">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box ctx"><span>Pulls this week's releases<small>TMDB: released in India · RapidAPI: added to each platform (cached daily)</small></span></div>
+    </foreignObject>
+    <foreignObject x="925" y="277" width="200" height="140">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box proc"><span>Filters and ranks<small>Recent titles only · his genres and languages · ongoing shows · top 20 shortlist</small></span></div>
+    </foreignObject>
+    <foreignObject x="1155" y="617" width="200" height="140">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box ai"><span>Judges each title<small>WATCH or SKIP, 0–100 match score, two-line synopsis and reason</small></span></div>
+    </foreignObject>
+    <foreignObject x="1385" y="797" width="200" height="120">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box msg">Sends the digest to Naman's Telegram chat</div>
+    </foreignObject>
+    <foreignObject x="1385" y="101" width="200" height="156">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="box out"><span>Friday OTT digest<small>Up to 12 picks, best first, with platform, runtime, genres, verdict and Open-in-app link (also on the website)</small></span></div>
+    </foreignObject>
   </svg>
-  </div>
-
-  <div class="value">
-    <div>
-      <h2>Problem</h2>
-      <p>Naman spends 20 minutes every Friday scrolling three apps to find what's new, because the apps push trending titles instead.</p>
-    </div>
-    <div>
-      <h2>Outcome</h2>
-      <p>One message a week with only new titles that fit his taste, a clear watch-or-skip call on each, and a link straight into the app.</p>
-    </div>
-    <div>
-      <h2>Reliability and cost</h2>
-      <p>Runs on free plans. If one data source or AI model is down, the digest still goes out. API use is cached and capped so the monthly quota lasts.</p>
-    </div>
   </div>
 </div>
