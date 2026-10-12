@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildDigest, sendDigest } from "@/lib/digest";
+import { getProfile } from "@/lib/db";
 
 export const maxDuration = 120;
 
@@ -18,9 +19,17 @@ export async function GET(req: NextRequest) {
   const send = req.nextUrl.searchParams.get("send") !== "false";
 
   try {
-    const entries = await buildDigest();
-    const messages = send ? await sendDigest(entries) : 0;
-    return NextResponse.json({ success: true, sent: send, messages, count: entries.length, entries });
+    const profile = await getProfile();
+    const digest = await buildDigest(profile);
+    const messages = send ? await sendDigest(digest, profile) : 0;
+    return NextResponse.json({
+      success: true,
+      sent: send,
+      messages,
+      count: digest.entries.length,
+      profile,
+      ...digest,
+    });
   } catch (error) {
     console.error("Digest error:", error);
     const message = error instanceof Error ? error.message : String(error);

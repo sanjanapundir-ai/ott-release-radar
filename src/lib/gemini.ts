@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { namanPreferences } from "./preferences";
+import { languageLabel, type Profile } from "./preferences";
 import type { OTTMediaItem } from "./tmdb";
 
 export interface Recommendation {
@@ -8,23 +8,41 @@ export interface Recommendation {
   matchScore: number;
   twoLineSynopsis: string;
   reason: string;
+  moodTag: string; // e.g. "Psychological slow-burn"
+  xRayInsight: string; // one notable fact about the director, cast or style
+  take: string; // MUBI-style micro-review
 }
 
+export const MOOD_TAGS = [
+  "High-octane thriller",
+  "Psychological slow-burn",
+  "Hard sci-fi",
+  "Mind-bending",
+  "Gritty crime",
+  "Quiet indie drama",
+  "Character study",
+  "Dark comedy",
+  "Feel-good",
+  "Edge-of-seat mystery",
+  "Epic spectacle",
+  "Easy watch",
+];
+
 export async function getGeminiRecommendations(
-  items: OTTMediaItem[]
+  items: OTTMediaItem[],
+  profile: Profile
 ): Promise<Map<string, Recommendation>> {
   if (items.length === 0) return new Map();
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is missing");
 
   const ai = new GoogleGenAI({ apiKey });
-  const prefs = namanPreferences;
-
-  const prompt = `You curate a weekly OTT digest for ${prefs.name}.
+  const prompt = `You curate a weekly OTT digest for ${profile.name}, in the spirit of a MUBI curator:
+restrained, specific, never marketing copy.
 Preference profile:
-- Loves: ${prefs.tastes.join(", ")}
-- Languages: ${prefs.languages.map((l) => l.label).join(", ")}
-- Platforms: ${prefs.platforms.map((p) => p.label).join(", ")}
+- Loves: ${profile.genres.join(", ")}
+- Languages: ${profile.languages.map(languageLabel).join(", ")}
+- Platforms: ${profile.platforms.join(", ")}
 - Watches 2-3 titles a week, so be selective: recommend WATCH only for strong matches.
 
 Titles released in India in the last 7 days:
@@ -50,9 +68,18 @@ ${JSON.stringify(
 Where criticRating, cast or directors are given, weigh them: a well-reviewed title or a
 notable director in his genres is a stronger WATCH; a weakly rated one needs a strong genre fit.
 
-For every title, return its exact "key", a verdict (WATCH or SKIP), a 0-100 matchScore
-against the profile, a synopsis of at most two short lines, and a one-sentence reason
-tied to his tastes.`;
+For every title, return:
+- "key": its exact key
+- "verdict": WATCH or SKIP
+- "matchScore": 0-100 fit against the profile
+- "twoLineSynopsis": what it is about, at most two short lines, no spoilers
+- "reason": one sentence on why it fits or doesn't fit his tastes
+- "moodTag": exactly one of: ${MOOD_TAGS.join(", ")}
+- "xRayInsight": one short, true fact worth knowing, such as the director's or a lead
+  actor's best-known work ("From the director of Gangs of Wasseypur"). Use only the
+  directors and cast given or facts you are sure of; never invent credits.
+- "take": a micro-review of at most 25 words about directorial voice, craft, tone or theme,
+  not plot.`;
 
   const request = {
     contents: prompt,
@@ -68,8 +95,11 @@ tied to his tastes.`;
             matchScore: { type: Type.INTEGER },
             twoLineSynopsis: { type: Type.STRING },
             reason: { type: Type.STRING },
+            moodTag: { type: Type.STRING, enum: MOOD_TAGS },
+            xRayInsight: { type: Type.STRING },
+            take: { type: Type.STRING },
           },
-          required: ["key", "verdict", "matchScore", "twoLineSynopsis", "reason"],
+          required: ["key", "verdict", "matchScore", "twoLineSynopsis", "reason", "moodTag", "xRayInsight", "take"],
         },
       },
     },
@@ -86,7 +116,7 @@ tied to his tastes.`;
       response = await ai.models.generateContent({
         model,
         ...request,
-        config: { ...request.config, abortSignal: AbortSignal.timeout(15_000) },
+        config: { ...request.config, abortSignal: AbortSignal.timeout(25_000) },
       });
       break;
     } catch (err) {

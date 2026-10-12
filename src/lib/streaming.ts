@@ -1,5 +1,5 @@
 import { cacheLife } from "next/cache";
-import { namanPreferences } from "./preferences";
+import { platformsFor } from "./preferences";
 
 // Streaming Availability API (Movie of the Night) via RapidAPI.
 // Unlike TMDB, it records the date a title was added to each platform in India,
@@ -80,11 +80,12 @@ function assertQuota() {
 }
 
 // Service IDs are looked up by name, like the TMDB providers, rather than hardcoded.
-async function resolveServices(): Promise<Map<string, string>> {
+async function resolveServices(platformLabels: string[]): Promise<Map<string, string>> {
+  const wanted = platformsFor(platformLabels);
   const country = await rapid<{ services: Service[] }>("/countries/in");
   const ids = new Map<string, string>();
   for (const s of country.services) {
-    const platform = namanPreferences.platforms.find((p) => p.match.test(s.name) || p.match.test(s.id));
+    const platform = wanted.find((p) => p.match.test(s.name) || p.match.test(s.id));
     if (platform) ids.set(s.id, platform.label);
   }
   if (ids.size === 0) throw new Error("No matching streaming services for India");
@@ -122,16 +123,16 @@ export function isStreamingAvailabilityEnabled(): boolean {
   return Boolean(process.env.RAPIDAPI_KEY);
 }
 
-// `day` (YYYY-MM-DD, UTC) is the cache key: every request on the same day, from any
-// instance, reuses one fetch. Errors are not cached, so a failed call retries next time.
-export async function fetchPlatformArrivals(day: string): Promise<PlatformArrival[]> {
+// `day` (YYYY-MM-DD, UTC) and the sorted platform list are the cache key: every request on
+// the same day, from any instance, reuses one fetch. Errors are not cached.
+export async function fetchPlatformArrivals(day: string, platformLabels: string[]): Promise<PlatformArrival[]> {
   "use cache: remote";
   cacheLife({ stale: 3600, revalidate: 86400, expire: 172800 });
 
   assertQuota();
   const toDate = new Date(`${day}T23:59:59Z`);
   const fromDate = new Date(toDate.getTime() - 7 * 86400 * 1000);
-  const services = await resolveServices();
+  const services = await resolveServices(platformLabels);
   const catalogs = [...services.keys()].map((id) => `${id}.subscription`).join(",");
   const from = Math.floor(fromDate.getTime() / 1000);
   const to = Math.floor(toDate.getTime() / 1000);

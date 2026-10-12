@@ -1,4 +1,4 @@
-import { namanPreferences } from "./preferences";
+import { genreIdsFor, platformsFor, type Profile } from "./preferences";
 import { fetchPlatformArrivals, isStreamingAvailabilityEnabled, type PlatformArrival } from "./streaming";
 
 export interface OTTMediaItem {
@@ -21,6 +21,9 @@ export interface OTTMediaItem {
   directors?: string[];
   newSeason?: number;
   ongoing?: boolean; // TV only: TMDB says the show is returning or in production
+  posterPath?: string; // TMDB image path, e.g. "/abc.jpg"
+  backdropPath?: string;
+  watchMinutes?: number; // film runtime, or the new season / new show's total episode time
 }
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -30,6 +33,7 @@ const POOL_PER_SOURCE = 10; // candidates per source sent to Gemini
 // released this recently; covers the usual theatrical-to-OTT gap.
 const FRESH_DAYS = 180;
 const MAX_ARRIVALS = 60;
+const TMDB_CONCURRENCY = 8;
 
 async function tmdb<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const apiKey = process.env.TMDB_API_KEY;
@@ -37,9 +41,33 @@ async function tmdb<T>(path: string, params: Record<string, string> = {}): Promi
   const url = new URL(`${TMDB_BASE_URL}${path}`);
   url.searchParams.set("api_key", apiKey);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`TMDB ${path} failed: ${res.status}`);
-  return res.json();
+  // Retries: TMDB occasionally drops a connection or rate-limits under load.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 429 || res.status >= 500) throw new Error(`TMDB ${path} failed: ${res.status}`);
+      if (!res.ok) throw Object.assign(new Error(`TMDB ${path} failed: ${res.status}`), { final: true });
+      return res.json();
+    } catch (err) {
+      if (attempt >= 2 || (err as { final?: boolean }).final) throw err;
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    }
+  }
+}
+
+// Runs `fn` over `items` with at most `limit` in flight, keeping input order.
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        results[i] = await fn(items[i]);
+      }
+    })
+  );
+  return results;
 }
 
 interface Provider {
@@ -47,15 +75,16 @@ interface Provider {
   provider_name: string;
 }
 
-// Resolve Naman's platforms to TMDB provider IDs for India.
-async function resolveProviders(): Promise<Map<number, string>> {
+// Resolve the profile's platforms to TMDB provider IDs for India.
+async function resolveProviders(platformLabels: string[]): Promise<Map<number, string>> {
+  const wanted = platformsFor(platformLabels);
   const [movie, tv] = await Promise.all([
     tmdb<{ results: Provider[] }>("/watch/providers/movie", { watch_region: "IN" }),
     tmdb<{ results: Provider[] }>("/watch/providers/tv", { watch_region: "IN" }),
   ]);
   const ids = new Map<number, string>();
   for (const p of [...movie.results, ...tv.results]) {
-    const platform = namanPreferences.platforms.find((pl) => pl.match.test(p.provider_name));
+    const platform = wanted.find((pl) => pl.match.test(p.provider_name));
     if (platform) ids.set(p.provider_id, platform.label);
   }
   if (ids.size === 0) throw new Error("Could not resolve any OTT providers for India");
@@ -87,7 +116,13 @@ interface Details {
   number_of_episodes?: number;
   number_of_seasons?: number;
   status?: string; // TV: "Returning Series", "In Production", "Planned", "Ended", "Canceled"
-  seasons?: { season_number: number; air_date: string | null }[];
+  seasons?: { season_number: number; air_date: string | null; episode_count?: number }[];
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  episode_run_time?: number[];
+  last_episode_to_air?: { runtime?: number | null } | null;
+  created_by?: { name: string }[];
+  credits?: { cast?: { name: string }[]; crew?: { job: string; name: string }[] };
 }
 
 // A returning show's new season counts only while the show is still continuing;
@@ -103,27 +138,27 @@ interface Candidate {
   arrival?: PlatformArrival;
 }
 
-export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
+export async function fetchWeeklyNewReleases(profile: Profile): Promise<OTTMediaItem[]> {
   const today = new Date();
   const past7Days = new Date(today);
   past7Days.setDate(today.getDate() - 7);
   const fromDate = past7Days.toISOString().split("T")[0];
   const toDate = today.toISOString().split("T")[0];
 
-  const prefs = namanPreferences;
-  const languageCodes = prefs.languages.map((l) => l.code);
+  const genreIds = genreIdsFor(profile);
+  const languageCodes = profile.languages;
 
   // Source 1: platform arrivals from Streaming Availability (exact "added on" dates).
   // Optional: without a key, or if RapidAPI fails, TMDB alone is used.
   const arrivalsPromise = isStreamingAvailabilityEnabled()
-    ? fetchPlatformArrivals(toDate).catch((err) => {
+    ? fetchPlatformArrivals(toDate, [...profile.platforms].sort()).catch((err) => {
         console.error("Streaming Availability unavailable, using TMDB only:", err);
         return [] as PlatformArrival[];
       })
     : Promise.resolve([] as PlatformArrival[]);
 
   // Source 2: TMDB discover (release dates + current platforms).
-  const providers = await resolveProviders();
+  const providers = await resolveProviders(profile.platforms);
   const common = {
     watch_region: "IN",
     with_watch_providers: [...providers.keys()].join("|"),
@@ -139,13 +174,13 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
       with_release_type: "4", // digital release
       "release_date.gte": fromDate,
       "release_date.lte": toDate,
-      with_genres: prefs.genres.movies.join("|"),
+      with_genres: genreIds.movies.join("|"),
     }),
     tmdb<{ results: DiscoverResult[] }>("/discover/tv", {
       ...common,
       "air_date.gte": fromDate,
       "air_date.lte": toDate,
-      with_genres: prefs.genres.tv.join("|"),
+      with_genres: genreIds.tv.join("|"),
     }),
   ]);
 
@@ -166,10 +201,13 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
   const freshFrom = freshCutoff.toISOString().split("T")[0];
   const isFresh = (d?: string | null) => Boolean(d && d >= freshFrom && d <= toDate);
 
-  const enriched = await Promise.all(
-    [...candidates.values()].map(async (c): Promise<{ item: OTTMediaItem; popularity: number } | null> => {
+  const enriched = await mapLimit(
+    [...candidates.values()],
+    TMDB_CONCURRENCY,
+    async (c): Promise<{ item: OTTMediaItem; popularity: number } | null> => {
+      let tmdbNewSeason: number | undefined;
       const [details, watch] = await Promise.all([
-        tmdb<Details>(`/${c.type}/${c.id}`),
+        tmdb<Details>(`/${c.type}/${c.id}`, { append_to_response: "credits" }),
         c.arrival
           ? Promise.resolve(null)
           : tmdb<{ results: { IN?: { flatrate?: Provider[] } } }>(`/${c.type}/${c.id}/watch/providers`),
@@ -177,7 +215,7 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
 
       // Arrivals cover every genre and language, so apply Naman's filters here.
       if (c.arrival) {
-        const wanted = c.type === "movie" ? prefs.genres.movies : prefs.genres.tv;
+        const wanted = c.type === "movie" ? genreIds.movies : genreIds.tv;
         if (!languageCodes.includes(details.original_language)) return null;
         if (!details.genres.some((g) => wanted.includes(g.id))) return null;
         // Platforms also add old catalogue titles; only recent releases count as new.
@@ -192,8 +230,9 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
       } else if (c.type === "tv") {
         // A TMDB-only show counts as new only if it premiered, or a new season started,
         // in the window, not because a weekly episode of a long-running show aired.
-        const newSeason = details.seasons?.some((s) => s.season_number > 0 && inWindow(s.air_date));
+        const newSeason = details.seasons?.find((s) => s.season_number > 0 && inWindow(s.air_date));
         if (!inWindow(details.first_air_date) && !newSeason) return null;
+        if (newSeason && newSeason.season_number > 1) tmdbNewSeason = newSeason.season_number;
         if (!inWindow(details.first_air_date) && !isOngoing(details)) return null;
       }
 
@@ -218,6 +257,25 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
           : "Series";
       }
 
+      const newSeason = c.arrival?.newSeason ?? tmdbNewSeason;
+      const episodeRuntime = details.episode_run_time?.[0] ?? details.last_episode_to_air?.runtime ?? 45;
+      const seasonEpisodes = newSeason
+        ? details.seasons?.find((s) => s.season_number === newSeason)?.episode_count
+        : undefined;
+      const watchMinutes =
+        c.type === "movie"
+          ? details.runtime || undefined
+          : (seasonEpisodes ?? details.number_of_episodes ?? 0) * episodeRuntime || undefined;
+      const directors =
+        c.arrival?.directors?.length
+          ? c.arrival.directors
+          : c.type === "movie"
+            ? (details.credits?.crew ?? []).filter((m) => m.job === "Director").map((m) => m.name).slice(0, 2)
+            : (details.created_by ?? []).map((m) => m.name).slice(0, 2);
+      const cast = c.arrival?.cast?.length
+        ? c.arrival.cast
+        : (details.credits?.cast ?? []).slice(0, 4).map((m) => m.name);
+
       const item: OTTMediaItem = {
         key: `${c.type}-${c.id}`,
         id: c.id,
@@ -228,18 +286,21 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
         genres: details.genres.map((g) => g.name),
         overview: details.overview || "No overview available.",
         runtimeOrEpisodes,
-        platforms: platforms.length ? platforms : ["Netflix / Prime / JioHotstar"],
+        platforms: platforms.length ? platforms : profile.platforms,
         verifiedArrival: Boolean(c.arrival),
         addedOn: c.arrival?.addedOn || undefined,
         link: c.arrival?.link,
         rating: c.arrival?.rating,
-        cast: c.arrival?.cast,
-        directors: c.arrival?.directors,
-        newSeason: c.arrival?.newSeason,
+        cast,
+        directors,
+        newSeason,
         ongoing: c.type === "tv" ? isOngoing(details) : undefined,
+        posterPath: details.poster_path ?? undefined,
+        backdropPath: details.backdrop_path ?? undefined,
+        watchMinutes,
       };
       return { item, popularity: details.popularity };
-    })
+    }
   );
 
   // Build the pool Gemini judges from both sources, so popular TMDB titles can't crowd
