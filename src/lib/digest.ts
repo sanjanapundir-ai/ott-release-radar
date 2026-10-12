@@ -8,7 +8,10 @@ export interface DigestEntry extends OTTMediaItem {
 
 export async function buildDigest(): Promise<DigestEntry[]> {
   const items = await fetchWeeklyNewReleases();
-  const recs = await getGeminiRecommendations(items);
+  const recs = await getGeminiRecommendations(items).catch((err) => {
+    console.error("Gemini unavailable, sending digest without verdicts:", err);
+    return new Map<string, Recommendation>();
+  });
   return items
     .map((item) => ({ ...item, recommendation: recs.get(item.key) }))
     .sort((a, b) => (b.recommendation?.matchScore ?? 0) - (a.recommendation?.matchScore ?? 0));

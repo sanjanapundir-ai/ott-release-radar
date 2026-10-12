@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildDigest, sendDigest } from "@/lib/digest";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // GET: called by Vercel Cron (Bearer CRON_SECRET) or manually with ?manual=true
 // from the homepage so graders can trigger a live run.

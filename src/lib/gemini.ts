@@ -45,8 +45,7 @@ For every title, return its exact "key", a verdict (WATCH or SKIP), a 0-100 matc
 against the profile, a synopsis of at most two short lines, and a one-sentence reason
 tied to his tastes.`;
 
-  const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL || "gemini-flash-latest",
+  const request = {
     contents: prompt,
     config: {
       responseMimeType: "application/json",
@@ -65,7 +64,28 @@ tied to his tastes.`;
         },
       },
     },
-  });
+  };
+
+  // Flash models return 503/429 under load; time-box each call and fall back to other Flash models.
+  const models = [
+    ...new Set([process.env.GEMINI_MODEL || "gemini-flash-latest", "gemini-3.5-flash", "gemini-flash-lite-latest"]),
+  ];
+  let response;
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      response = await ai.models.generateContent({
+        model,
+        ...request,
+        config: { ...request.config, abortSignal: AbortSignal.timeout(15_000) },
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`Gemini ${model} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+  if (!response) throw lastError;
 
   try {
     const parsed: Recommendation[] = JSON.parse(response.text ?? "[]");

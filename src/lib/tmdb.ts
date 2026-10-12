@@ -107,14 +107,19 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
     ...shows.results.map((r) => ({ ...r, type: "tv" as const })),
   ]
     .sort((a, b) => b.popularity - a.popularity)
-    .slice(0, MAX_ITEMS);
+    .slice(0, MAX_ITEMS * 2);
 
-  return Promise.all(
-    candidates.map(async (c): Promise<OTTMediaItem> => {
+  const inWindow = (d?: string | null) => Boolean(d && d >= fromDate && d <= toDate);
+
+  const enriched = await Promise.all(
+    candidates.map(async (c): Promise<OTTMediaItem | null> => {
       const [details, watch] = await Promise.all([
-        tmdb<{ runtime?: number; number_of_episodes?: number; number_of_seasons?: number }>(
-          `/${c.type}/${c.id}`
-        ),
+        tmdb<{
+          runtime?: number;
+          number_of_episodes?: number;
+          number_of_seasons?: number;
+          seasons?: { season_number: number; air_date: string | null }[];
+        }>(`/${c.type}/${c.id}`),
         tmdb<{ results: { IN?: { flatrate?: Provider[] } } }>(`/${c.type}/${c.id}/watch/providers`),
       ]);
 
@@ -125,6 +130,13 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
             .filter((p): p is string => Boolean(p))
         ),
       ];
+
+      // A TV show is "new this week" only if it premiered, or a new season started,
+      // in the window — not because a weekly episode of a long-running show aired.
+      if (c.type === "tv") {
+        const newSeason = details.seasons?.some((s) => s.season_number > 0 && inWindow(s.air_date));
+        if (!inWindow(c.first_air_date) && !newSeason) return null;
+      }
 
       let runtimeOrEpisodes: string;
       if (c.type === "movie") {
@@ -151,4 +163,6 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
       };
     })
   );
+
+  return enriched.filter((e): e is OTTMediaItem => e !== null).slice(0, MAX_ITEMS);
 }
