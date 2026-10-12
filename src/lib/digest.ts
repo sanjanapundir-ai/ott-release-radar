@@ -21,13 +21,20 @@ function formatEntry(e: DigestEntry): string {
   const r = e.recommendation;
   const verdict = r ? (r.verdict === "WATCH" ? "✅ <b>WATCH</b>" : "⏭ <b>SKIP</b>") : "❔ <b>No verdict</b>";
   const synopsis = r?.twoLineSynopsis ?? e.overview.slice(0, 160);
+  const added = [
+    e.newSeason ? `Season ${e.newSeason} new` : "",
+    e.addedOn ? `added ${e.addedOn}` : "",
+  ].filter(Boolean).join(", ");
   const lines = [
     `🎬 <b>${escapeHtml(e.title)}</b> (${e.type === "movie" ? "Movie" : "Series"} · ${e.language.toUpperCase()})`,
-    `📺 ${escapeHtml(e.platforms.join(", "))} · ⏱ ${escapeHtml(e.runtimeOrEpisodes)}`,
+    `📺 ${escapeHtml(e.platforms.join(", "))} · ⏱ ${escapeHtml(e.runtimeOrEpisodes)}${added ? ` · ${escapeHtml(added)}` : ""}`,
     `🏷 ${escapeHtml(e.genres.join(", ") || "—")}`,
     `📝 ${escapeHtml(synopsis)}`,
     `${verdict}${r ? ` (${r.matchScore}/100) — ${escapeHtml(r.reason)}` : ""}`,
   ];
+  if (e.link?.startsWith("https://")) {
+    lines.push(`▶️ <a href="${escapeHtml(e.link).replace(/"/g, "&quot;")}">Open in ${escapeHtml(e.platforms[0])}</a>`);
+  }
   return lines.join("\n");
 }
 

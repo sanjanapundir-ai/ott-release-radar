@@ -1,4 +1,5 @@
 import { namanPreferences } from "./preferences";
+import { fetchPlatformArrivals, isStreamingAvailabilityEnabled, type PlatformArrival } from "./streaming";
 
 export interface OTTMediaItem {
   key: string; // `${type}-${id}` — movie and TV IDs overlap in TMDB
@@ -11,10 +12,19 @@ export interface OTTMediaItem {
   overview: string;
   runtimeOrEpisodes: string;
   platforms: string[];
+  // From Streaming Availability (RapidAPI), when the title was found there
+  verifiedArrival: boolean;
+  addedOn?: string;
+  link?: string;
+  rating?: number;
+  cast?: string[];
+  directors?: string[];
+  newSeason?: number;
 }
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const MAX_ITEMS = 12;
+const MAX_ARRIVALS = 60;
 
 async function tmdb<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const apiKey = process.env.TMDB_API_KEY;
@@ -47,14 +57,6 @@ async function resolveProviders(): Promise<Map<number, string>> {
   return ids;
 }
 
-async function genreNames(): Promise<Map<number, string>> {
-  const [movie, tv] = await Promise.all([
-    tmdb<{ genres: { id: number; name: string }[] }>("/genre/movie/list"),
-    tmdb<{ genres: { id: number; name: string }[] }>("/genre/tv/list"),
-  ]);
-  return new Map([...movie.genres, ...tv.genres].map((g) => [g.id, g.name]));
-}
-
 interface DiscoverResult {
   id: number;
   title?: string;
@@ -67,6 +69,27 @@ interface DiscoverResult {
   popularity: number;
 }
 
+interface Details {
+  title?: string;
+  name?: string;
+  release_date?: string;
+  first_air_date?: string;
+  original_language: string;
+  genres: { id: number; name: string }[];
+  overview: string;
+  popularity: number;
+  runtime?: number;
+  number_of_episodes?: number;
+  number_of_seasons?: number;
+  seasons?: { season_number: number; air_date: string | null }[];
+}
+
+interface Candidate {
+  type: "movie" | "tv";
+  id: number;
+  arrival?: PlatformArrival;
+}
+
 export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
   const today = new Date();
   const past7Days = new Date(today);
@@ -74,69 +97,88 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
   const fromDate = past7Days.toISOString().split("T")[0];
   const toDate = today.toISOString().split("T")[0];
 
-  const [providers, genres] = await Promise.all([resolveProviders(), genreNames()]);
-  const providerIds = [...providers.keys()].join("|");
-  const languages = namanPreferences.languages.map((l) => l.code).join("|");
+  const prefs = namanPreferences;
+  const languageCodes = prefs.languages.map((l) => l.code);
+
+  // Source 1: platform arrivals from Streaming Availability (exact "added on" dates).
+  // Optional: without a key, or if RapidAPI fails, TMDB alone is used.
+  const arrivalsPromise = isStreamingAvailabilityEnabled()
+    ? fetchPlatformArrivals(past7Days, today).catch((err) => {
+        console.error("Streaming Availability unavailable, using TMDB only:", err);
+        return [] as PlatformArrival[];
+      })
+    : Promise.resolve([] as PlatformArrival[]);
+
+  // Source 2: TMDB discover (release dates + current platforms).
+  const providers = await resolveProviders();
   const common = {
     watch_region: "IN",
-    with_watch_providers: providerIds,
+    with_watch_providers: [...providers.keys()].join("|"),
     with_watch_monetization_types: "flatrate",
-    with_original_language: languages,
+    with_original_language: languageCodes.join("|"),
     sort_by: "popularity.desc",
   };
-
-  const [movies, shows] = await Promise.all([
+  const [arrivals, movies, shows] = await Promise.all([
+    arrivalsPromise,
     tmdb<{ results: DiscoverResult[] }>("/discover/movie", {
       ...common,
       region: "IN",
       with_release_type: "4", // digital release
       "release_date.gte": fromDate,
       "release_date.lte": toDate,
-      with_genres: namanPreferences.genres.movies.join("|"),
+      with_genres: prefs.genres.movies.join("|"),
     }),
     tmdb<{ results: DiscoverResult[] }>("/discover/tv", {
       ...common,
       "air_date.gte": fromDate,
       "air_date.lte": toDate,
-      with_genres: namanPreferences.genres.tv.join("|"),
+      with_genres: prefs.genres.tv.join("|"),
     }),
   ]);
 
-  const candidates = [
-    ...movies.results.map((r) => ({ ...r, type: "movie" as const })),
-    ...shows.results.map((r) => ({ ...r, type: "tv" as const })),
-  ]
-    .sort((a, b) => b.popularity - a.popularity)
-    .slice(0, MAX_ITEMS * 2);
+  const candidates = new Map<string, Candidate>();
+  for (const a of arrivals.slice(0, MAX_ARRIVALS)) {
+    candidates.set(a.key, { type: a.type, id: a.tmdbId, arrival: a });
+  }
+  for (const r of movies.results.slice(0, MAX_ITEMS)) {
+    if (!candidates.has(`movie-${r.id}`)) candidates.set(`movie-${r.id}`, { type: "movie", id: r.id });
+  }
+  for (const r of shows.results.slice(0, MAX_ITEMS)) {
+    if (!candidates.has(`tv-${r.id}`)) candidates.set(`tv-${r.id}`, { type: "tv", id: r.id });
+  }
 
   const inWindow = (d?: string | null) => Boolean(d && d >= fromDate && d <= toDate);
 
   const enriched = await Promise.all(
-    candidates.map(async (c): Promise<OTTMediaItem | null> => {
+    [...candidates.values()].map(async (c): Promise<{ item: OTTMediaItem; popularity: number } | null> => {
       const [details, watch] = await Promise.all([
-        tmdb<{
-          runtime?: number;
-          number_of_episodes?: number;
-          number_of_seasons?: number;
-          seasons?: { season_number: number; air_date: string | null }[];
-        }>(`/${c.type}/${c.id}`),
-        tmdb<{ results: { IN?: { flatrate?: Provider[] } } }>(`/${c.type}/${c.id}/watch/providers`),
+        tmdb<Details>(`/${c.type}/${c.id}`),
+        c.arrival
+          ? Promise.resolve(null)
+          : tmdb<{ results: { IN?: { flatrate?: Provider[] } } }>(`/${c.type}/${c.id}/watch/providers`),
       ]);
 
-      const platforms = [
-        ...new Set(
-          (watch.results.IN?.flatrate ?? [])
-            .map((p) => providers.get(p.provider_id))
-            .filter((p): p is string => Boolean(p))
-        ),
-      ];
-
-      // A TV show is "new this week" only if it premiered, or a new season started,
-      // in the window — not because a weekly episode of a long-running show aired.
-      if (c.type === "tv") {
+      // Arrivals cover every genre and language, so apply Naman's filters here.
+      if (c.arrival) {
+        const wanted = c.type === "movie" ? prefs.genres.movies : prefs.genres.tv;
+        if (!languageCodes.includes(details.original_language)) return null;
+        if (!details.genres.some((g) => wanted.includes(g.id))) return null;
+      } else if (c.type === "tv") {
+        // A TMDB-only show counts as new only if it premiered, or a new season started,
+        // in the window, not because a weekly episode of a long-running show aired.
         const newSeason = details.seasons?.some((s) => s.season_number > 0 && inWindow(s.air_date));
-        if (!inWindow(c.first_air_date) && !newSeason) return null;
+        if (!inWindow(details.first_air_date) && !newSeason) return null;
       }
+
+      const platforms = c.arrival
+        ? c.arrival.platforms
+        : [
+            ...new Set(
+              (watch?.results.IN?.flatrate ?? [])
+                .map((p) => providers.get(p.provider_id))
+                .filter((p): p is string => Boolean(p))
+            ),
+          ];
 
       let runtimeOrEpisodes: string;
       if (c.type === "movie") {
@@ -149,20 +191,36 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
           : "Series";
       }
 
-      return {
+      const item: OTTMediaItem = {
         key: `${c.type}-${c.id}`,
         id: c.id,
-        title: c.title ?? c.name ?? "Untitled",
+        title: details.title ?? details.name ?? "Untitled",
         type: c.type,
-        releaseDate: c.release_date ?? c.first_air_date ?? "",
-        language: c.original_language,
-        genres: c.genre_ids.map((g) => genres.get(g)).filter((g): g is string => Boolean(g)),
-        overview: c.overview || "No overview available.",
+        releaseDate: details.release_date ?? details.first_air_date ?? "",
+        language: details.original_language,
+        genres: details.genres.map((g) => g.name),
+        overview: details.overview || "No overview available.",
         runtimeOrEpisodes,
         platforms: platforms.length ? platforms : ["Netflix / Prime / JioHotstar"],
+        verifiedArrival: Boolean(c.arrival),
+        addedOn: c.arrival?.addedOn || undefined,
+        link: c.arrival?.link,
+        rating: c.arrival?.rating,
+        cast: c.arrival?.cast,
+        directors: c.arrival?.directors,
+        newSeason: c.arrival?.newSeason,
       };
+      return { item, popularity: details.popularity };
     })
   );
 
-  return enriched.filter((e): e is OTTMediaItem => e !== null).slice(0, MAX_ITEMS);
+  // Titles confirmed as added to a platform this week come first, then by popularity.
+  return enriched
+    .filter((e) => e !== null)
+    .sort(
+      (a, b) =>
+        Number(b.item.verifiedArrival) - Number(a.item.verifiedArrival) || b.popularity - a.popularity
+    )
+    .slice(0, MAX_ITEMS)
+    .map((e) => e.item);
 }

@@ -36,10 +36,18 @@ ${JSON.stringify(
     language: i.language,
     genres: i.genres,
     overview: i.overview,
+    platforms: i.platforms,
+    ...(i.newSeason ? { newSeason: i.newSeason } : {}),
+    ...(i.rating !== undefined ? { criticRating: `${i.rating}/100` } : {}),
+    ...(i.directors?.length ? { directors: i.directors } : {}),
+    ...(i.cast?.length ? { cast: i.cast } : {}),
   })),
   null,
   2
 )}
+
+Where criticRating, cast or directors are given, weigh them: a well-reviewed title or a
+notable director in his genres is a stronger WATCH; a weakly rated one needs a strong genre fit.
 
 For every title, return its exact "key", a verdict (WATCH or SKIP), a 0-100 matchScore
 against the profile, a synopsis of at most two short lines, and a one-sentence reason

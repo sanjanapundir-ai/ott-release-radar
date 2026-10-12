@@ -99,10 +99,22 @@ export default function Home() {
                   <p className="mt-1 text-xs text-zinc-400">
                     {e.type === "movie" ? "Movie" : "Series"} · {e.language.toUpperCase()} ·{" "}
                     {e.platforms.join(", ")} · {e.runtimeOrEpisodes}
+                    {e.newSeason ? ` · Season ${e.newSeason} new` : ""}
+                    {e.addedOn ? ` · added ${e.addedOn}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">{e.genres.join(", ")}</p>
                   <p className="mt-2 text-sm text-zinc-300">{r?.twoLineSynopsis ?? e.overview}</p>
                   {r && <p className="mt-2 text-xs italic text-zinc-400">{r.reason}</p>}
+                  {e.link?.startsWith("https://") && (
+                    <a
+                      href={e.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-xs font-semibold text-emerald-400 hover:underline"
+                    >
+                      Open in {e.platforms[0]} →
+                    </a>
+                  )}
                 </li>
               );
             })}
