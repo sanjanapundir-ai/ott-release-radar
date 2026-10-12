@@ -25,6 +25,9 @@ export interface OTTMediaItem {
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const MAX_ITEMS = 12; // TMDB discover results taken per type
 const POOL_PER_SOURCE = 10; // candidates per source sent to Gemini
+// A platform arrival counts as new only if the film (or the arriving season) was first
+// released this recently; covers the usual theatrical-to-OTT gap.
+const FRESH_DAYS = 180;
 const MAX_ARRIVALS = 60;
 
 async function tmdb<T>(path: string, params: Record<string, string> = {}): Promise<T> {
@@ -104,7 +107,7 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
   // Source 1: platform arrivals from Streaming Availability (exact "added on" dates).
   // Optional: without a key, or if RapidAPI fails, TMDB alone is used.
   const arrivalsPromise = isStreamingAvailabilityEnabled()
-    ? fetchPlatformArrivals(past7Days, today).catch((err) => {
+    ? fetchPlatformArrivals(toDate).catch((err) => {
         console.error("Streaming Availability unavailable, using TMDB only:", err);
         return [] as PlatformArrival[];
       })
@@ -149,6 +152,10 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
   }
 
   const inWindow = (d?: string | null) => Boolean(d && d >= fromDate && d <= toDate);
+  const freshCutoff = new Date(today);
+  freshCutoff.setDate(today.getDate() - FRESH_DAYS);
+  const freshFrom = freshCutoff.toISOString().split("T")[0];
+  const isFresh = (d?: string | null) => Boolean(d && d >= freshFrom && d <= toDate);
 
   const enriched = await Promise.all(
     [...candidates.values()].map(async (c): Promise<{ item: OTTMediaItem; popularity: number } | null> => {
@@ -164,6 +171,14 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
         const wanted = c.type === "movie" ? prefs.genres.movies : prefs.genres.tv;
         if (!languageCodes.includes(details.original_language)) return null;
         if (!details.genres.some((g) => wanted.includes(g.id))) return null;
+        // Platforms also add old catalogue titles; only recent releases count as new.
+        if (c.type === "movie" && !isFresh(details.release_date)) return null;
+        if (c.type === "tv") {
+          const season = c.arrival.newSeason
+            ? details.seasons?.find((s) => s.season_number === c.arrival!.newSeason)
+            : undefined;
+          if (!isFresh(details.first_air_date) && !isFresh(season?.air_date)) return null;
+        }
       } else if (c.type === "tv") {
         // A TMDB-only show counts as new only if it premiered, or a new season started,
         // in the window, not because a weekly episode of a long-running show aired.

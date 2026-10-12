@@ -1,11 +1,14 @@
+import { cacheLife } from "next/cache";
 import { namanPreferences } from "./preferences";
 
 // Streaming Availability API (Movie of the Night) via RapidAPI.
 // Unlike TMDB, it records the date a title was added to each platform in India,
 // so it answers "what landed on Netflix / Prime / JioHotstar this week" directly.
 const HOST = "streaming-availability.p.rapidapi.com";
-const MAX_PAGES = 3; // 25 changes per page; keeps a run within the free plan's quota
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const MAX_PAGES = 3; // 25 changes per page
+// The free plan allows 1,000 requests a month. Results are cached once per day in the
+// shared remote cache, and live calls stop when fewer than this many requests remain.
+const QUOTA_RESERVE = 100;
 
 export interface PlatformArrival {
   key: string; // `${type}-${tmdbId}`, same shape as OTTMediaItem.key
@@ -61,8 +64,19 @@ async function rapid<T>(path: string, params: Record<string, string> = {}): Prom
     headers: { "X-RapidAPI-Key": key, "X-RapidAPI-Host": HOST },
     cache: "no-store",
   });
+  const remaining = Number(res.headers.get("x-ratelimit-api-request-remaining"));
+  if (Number.isFinite(remaining)) quotaRemaining = remaining;
   if (!res.ok) throw new Error(`Streaming Availability ${path} failed: ${res.status} ${await res.text()}`);
   return res.json();
+}
+
+// Last value of RapidAPI's remaining-requests header seen by this instance.
+let quotaRemaining = Infinity;
+
+function assertQuota() {
+  if (quotaRemaining < QUOTA_RESERVE) {
+    throw new Error(`RapidAPI quota low (${quotaRemaining} requests left); skipping until it resets`);
+  }
 }
 
 // Service IDs are looked up by name, like the TMDB providers, rather than hardcoded.
@@ -86,6 +100,7 @@ async function fetchChanges(
   const pages: ChangesResponse[] = [];
   let cursor: string | undefined;
   for (let i = 0; i < MAX_PAGES; i++) {
+    assertQuota();
     const page = await rapid<ChangesResponse>("/changes", {
       country: "in",
       change_type: "new",
@@ -103,15 +118,19 @@ async function fetchChanges(
   return pages;
 }
 
-let cache: { at: number; data: PlatformArrival[] } | null = null;
-
 export function isStreamingAvailabilityEnabled(): boolean {
   return Boolean(process.env.RAPIDAPI_KEY);
 }
 
-export async function fetchPlatformArrivals(fromDate: Date, toDate: Date): Promise<PlatformArrival[]> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
+// `day` (YYYY-MM-DD, UTC) is the cache key: every request on the same day, from any
+// instance, reuses one fetch. Errors are not cached, so a failed call retries next time.
+export async function fetchPlatformArrivals(day: string): Promise<PlatformArrival[]> {
+  "use cache: remote";
+  cacheLife({ stale: 3600, revalidate: 86400, expire: 172800 });
 
+  assertQuota();
+  const toDate = new Date(`${day}T23:59:59Z`);
+  const fromDate = new Date(toDate.getTime() - 7 * 86400 * 1000);
   const services = await resolveServices();
   const catalogs = [...services.keys()].map((id) => `${id}.subscription`).join(",");
   const from = Math.floor(fromDate.getTime() / 1000);
@@ -158,7 +177,5 @@ export async function fetchPlatformArrivals(fromDate: Date, toDate: Date): Promi
     }
   }
 
-  const data = [...arrivals.values()];
-  cache = { at: Date.now(), data };
-  return data;
+  return [...arrivals.values()];
 }
