@@ -70,12 +70,12 @@ svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: 
 <div class="sheet">
   <header>
     <h1>OTT Release Radar — component map</h1>
-    <p class="sub">Next.js 16 App Router · one screen + one API route · Vercel Cron · no database</p>
+    <p class="sub">Next.js 16 App Router · one screen + one API route · Vercel Cron · TMDB + RapidAPI · no database</p>
     <div class="links"><a href="https://ott-release-radar-theta.vercel.app">Live app</a><a href="https://github.com/sanjanapundir-ai/ott-release-radar">GitHub repository</a></div>
   </header>
 
   <div class="diagram">
-  <svg viewBox="0 110 1600 970" role="img" aria-label="Component map: layout.tsx renders page.tsx, which shows the profile, buttons, status and a list of digest entries and calls the digest API route. Vercel Cron also calls the route. The route uses lib/digest.ts, which uses tmdb.ts, gemini.ts and telegram.ts, which call TMDB, Gemini Flash and the Telegram Bot API.">
+  <svg viewBox="0 110 1600 970" role="img" aria-label="Component map: layout.tsx renders page.tsx, which shows the profile, buttons, status and a list of digest entries and calls the digest API route. Vercel Cron also calls the route. The route uses lib/digest.ts, which uses tmdb.ts (with streaming.ts), gemini.ts and telegram.ts. These call Streaming Availability on RapidAPI, TMDB, Gemini Flash and the Telegram Bot API.">
     <defs>
       <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path class="ah" d="M0 0 L10 5 L0 10 z"/>
@@ -134,7 +134,7 @@ svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: 
       <rect x="770" y="555" width="320" height="92" rx="10"/>
       <text class="t" x="930" y="583">DigestEntry card</text>
       <text class="s" x="930" y="605">title · platform · runtime · genre tags</text>
-      <text class="s" x="930" y="625">synopsis · WATCH / SKIP badge · reason</text>
+      <text class="s" x="930" y="625">synopsis · WATCH / SKIP · reason · Open link</text>
     </g>
 
     <!-- ===== Backend path (right) ===== -->
@@ -157,10 +157,10 @@ svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: 
     <text class="note" x="934" y="274" text-anchor="middle">fetch /api/digest</text>
     <text class="note" x="934" y="306" text-anchor="middle">?manual=true · &amp;send=false to preview</text>
 
-    <path class="e" d="M1330 332 V660 H1404 V743" marker-end="url(#ah)"/>
+    <path class="e" d="M1330 332 V660 H1425 V743" marker-end="url(#ah)"/>
     <text class="note" x="1342" y="372">buildDigest() → sendDigest()</text>
 
-    <text class="note" x="1356" y="440">one run ≈ 15 s · function limit 120 s</text>
+    <text class="note" x="1356" y="440">one run ≈ 30 s · function limit 120 s</text>
     <text class="note" x="1356" y="464">Gemini down → digest still sends,</text>
     <text class="note" x="1356" y="484">just without verdicts</text>
     <text class="note" x="1356" y="512">no database: the profile lives</text>
@@ -172,62 +172,74 @@ svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: 
     <text class="panel-label" x="64" y="724">lib/ — pipeline logic, no UI (called by route.ts)</text>
 
     <g class="n lib">
-      <rect x="60" y="745" width="272" height="128" rx="10"/>
-      <text class="t" x="196" y="775">preferences.ts</text>
-      <text class="s" x="196" y="802">languages hi · en · ta</text>
-      <text class="s" x="196" y="822">genre IDs · platforms by name</text>
-      <text class="u" x="196" y="852">← tmdb.ts, gemini.ts</text>
+      <rect x="60" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="175" y="775">preferences.ts</text>
+      <text class="s" x="175" y="802">languages hi · en · ta</text>
+      <text class="s" x="175" y="822">genre IDs · platform names</text>
+      <text class="u" x="175" y="852">← tmdb, streaming, gemini</text>
     </g>
     <g class="n lib">
-      <rect x="362" y="745" width="272" height="128" rx="10"/>
-      <text class="t" x="498" y="775">tmdb.ts</text>
-      <text class="s" x="498" y="802">India providers · last 7 days</text>
-      <text class="s" x="498" y="822">new shows or seasons · top 12</text>
-      <text class="u" x="498" y="852">← digest.ts</text>
+      <rect x="310" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="425" y="775">streaming.ts</text>
+      <text class="s" x="425" y="802">added to platform this week</text>
+      <text class="s" x="425" y="822">exact dates · app links</text>
+      <text class="u" x="425" y="852">← tmdb.ts</text>
     </g>
     <g class="n lib">
-      <rect x="664" y="745" width="272" height="128" rx="10"/>
-      <text class="t" x="800" y="775">gemini.ts</text>
-      <text class="s" x="800" y="802">one batched call · JSON verdicts</text>
-      <text class="s" x="800" y="822">15 s timeout · Flash fallbacks</text>
-      <text class="u" x="800" y="852">← digest.ts</text>
+      <rect x="560" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="675" y="775">tmdb.ts</text>
+      <text class="s" x="675" y="802">merges both sources</text>
+      <text class="s" x="675" y="822">filters · pools 10 + 10</text>
+      <text class="u" x="675" y="852">← digest.ts</text>
     </g>
     <g class="n lib">
-      <rect x="966" y="745" width="272" height="128" rx="10"/>
-      <text class="t" x="1102" y="775">telegram.ts</text>
-      <text class="s" x="1102" y="802">HTML escape · split under 4096</text>
-      <text class="s" x="1102" y="822">throws if Telegram rejects</text>
-      <text class="u" x="1102" y="852">← digest.ts</text>
+      <rect x="810" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="925" y="775">gemini.ts</text>
+      <text class="s" x="925" y="802">batched JSON verdicts</text>
+      <text class="s" x="925" y="822">rating · cast · 15 s timeout</text>
+      <text class="u" x="925" y="852">← digest.ts</text>
+    </g>
+    <g class="n lib">
+      <rect x="1060" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="1175" y="775">telegram.ts</text>
+      <text class="s" x="1175" y="802">HTML · split under 4096</text>
+      <text class="s" x="1175" y="822">Open-in-app links</text>
+      <text class="u" x="1175" y="852">← digest.ts</text>
     </g>
     <g class="n core inlib">
-      <rect x="1268" y="745" width="272" height="128" rx="10"/>
-      <text class="t" x="1404" y="775">digest.ts</text>
-      <text class="s" x="1404" y="802">joins TMDB data + verdicts</text>
-      <text class="s" x="1404" y="822">sorts · formats each entry</text>
-      <text class="u" x="1404" y="852">← route.ts</text>
+      <rect x="1310" y="745" width="230" height="128" rx="10"/>
+      <text class="t" x="1425" y="775">digest.ts</text>
+      <text class="s" x="1425" y="802">joins data + verdicts</text>
+      <text class="s" x="1425" y="822">top 12 by match score</text>
+      <text class="u" x="1425" y="852">← route.ts</text>
     </g>
 
     <!-- ===== External services ===== -->
-    <path class="e" d="M498 873 V928" marker-end="url(#ah)"/>
-    <path class="e" d="M800 873 V928" marker-end="url(#ah)"/>
-    <path class="e" d="M1102 873 V928" marker-end="url(#ah)"/>
     <text class="note" x="64" y="960">external services</text>
-    <text class="note" x="64" y="980">(live data, called over HTTPS)</text>
-
+    <text class="note" x="64" y="980">(live data over HTTPS)</text>
+    <path class="e" d="M425 873 V928" marker-end="url(#ah)"/>
     <g class="n ext">
-      <rect x="362" y="930" width="272" height="68" rx="10"/>
-      <text class="t" x="498" y="958">TMDB API v3</text>
-      <text class="s" x="498" y="982">discover · watch providers · details</text>
+      <rect x="310" y="930" width="230" height="68" rx="10"/>
+      <text class="t" x="425" y="958">Streaming Availability</text>
+      <text class="s" x="425" y="982">RapidAPI · arrivals in India</text>
     </g>
+    <path class="e" d="M675 873 V928" marker-end="url(#ah)"/>
     <g class="n ext">
-      <rect x="664" y="930" width="272" height="68" rx="10"/>
-      <text class="t" x="800" y="958">Gemini Flash</text>
-      <text class="s" x="800" y="982">flash-latest → 3.5 → flash-lite</text>
+      <rect x="560" y="930" width="230" height="68" rx="10"/>
+      <text class="t" x="675" y="958">TMDB API v3</text>
+      <text class="s" x="675" y="982">discover · providers · details</text>
     </g>
+    <path class="e" d="M925 873 V928" marker-end="url(#ah)"/>
     <g class="n ext">
-      <rect x="966" y="930" width="272" height="68" rx="10"/>
-      <text class="t" x="1102" y="958">Telegram Bot API</text>
-      <text class="s" x="1102" y="982">sendMessage → @Moodymovies_bot</text>
+      <rect x="810" y="930" width="230" height="68" rx="10"/>
+      <text class="t" x="925" y="958">Gemini Flash</text>
+      <text class="s" x="925" y="982">flash-latest → 3.5 → lite</text>
+    </g>
+    <path class="e" d="M1175 873 V928" marker-end="url(#ah)"/>
+    <g class="n ext">
+      <rect x="1060" y="930" width="230" height="68" rx="10"/>
+      <text class="t" x="1175" y="958">Telegram Bot API</text>
+      <text class="s" x="1175" y="982">sendMessage → Naman’s chat</text>
     </g>
 
     <!-- ===== Legend ===== -->
