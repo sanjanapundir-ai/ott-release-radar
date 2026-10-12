@@ -1,67 +1,63 @@
 <title>OTT Release Radar Components</title>
 <style>
-/* Layout: one wide diagram card, like a whiteboard component map. Tree on the left (UI), request path on the right (backend), lib/ panel and external services below. */
+/* Layout: business view. One Input → Process → Output diagram, then three value cards. Plain language, no file names. */
 :root {
   --bg: #f4f4f6;
   --card: #ffffff;
   --ink: #1d1d22;
   --muted: #55555f;
   --edge: #8a8a92;
-  --core-fill: #eeedfc; --core-line: #6b5bd6; --core-ink: #3b2fa0;
-  --ui-fill: #e7f4ee;   --ui-line: #4f9a80;   --ui-ink: #1f5c47;
-  --ext-fill: #fbebe6;  --ext-line: #b5533c;  --ext-ink: #7a2a17;
-  --lib-fill: #f2f1ed;  --lib-line: #a8a6a0;  --lib-ink: #2f2e2a;
+  --band: #f7f7f9;
+  --in-fill: #e7f4ee;   --in-line: #4f9a80;   --in-ink: #1f5c47;
+  --pr-fill: #eeedfc;   --pr-line: #6b5bd6;   --pr-ink: #3b2fa0;
+  --out-fill: #fbebe6;  --out-line: #b5533c;  --out-ink: #7a2a17;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e;
-    --core-fill: #24213f; --core-line: #8f82ea; --core-ink: #c9c2ff;
-    --ui-fill: #16302a;   --ui-line: #5fb497;   --ui-ink: #a9e2cd;
-    --ext-fill: #3a1f18;  --ext-line: #d27a62;  --ext-ink: #f5c3b4;
-    --lib-fill: #26252a;  --lib-line: #6c6a72;  --lib-ink: #e2e1e6;
+    --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e; --band: #202026;
+    --in-fill: #16302a;  --in-line: #5fb497;  --in-ink: #a9e2cd;
+    --pr-fill: #24213f;  --pr-line: #8f82ea;  --pr-ink: #c9c2ff;
+    --out-fill: #3a1f18; --out-line: #d27a62; --out-ink: #f5c3b4;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e;
-  --core-fill: #24213f; --core-line: #8f82ea; --core-ink: #c9c2ff;
-  --ui-fill: #16302a;   --ui-line: #5fb497;   --ui-ink: #a9e2cd;
-  --ext-fill: #3a1f18;  --ext-line: #d27a62;  --ext-ink: #f5c3b4;
-  --lib-fill: #26252a;  --lib-line: #6c6a72;  --lib-ink: #e2e1e6;
+  --bg: #111114; --card: #1a1a1f; --ink: #ececf1; --muted: #a3a3ad; --edge: #74747e; --band: #202026;
+  --in-fill: #16302a;  --in-line: #5fb497;  --in-ink: #a9e2cd;
+  --pr-fill: #24213f;  --pr-line: #8f82ea;  --pr-ink: #c9c2ff;
+  --out-fill: #3a1f18; --out-line: #d27a62; --out-ink: #f5c3b4;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font); padding-inline: 16px; padding-block: 32px 48px; }
-.sheet { max-width: 1240px; margin: 0 auto; background: var(--card); border-radius: 18px; padding: 32px 28px 24px; display: grid; gap: 20px; }
+.sheet { max-width: 1240px; margin: 0 auto; background: var(--card); border-radius: 18px; padding: 32px 28px 28px; display: grid; gap: 22px; }
 header { display: grid; gap: 6px; }
 h1 { margin: 0; font-size: clamp(1.5rem, 3.4vw, 2rem); font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
-.sub { margin: 0; color: var(--muted); font-size: 15px; }
+.sub { margin: 0; color: var(--muted); font-size: 15px; max-width: 75ch; line-height: 1.5; }
 .links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
-.links a { color: var(--core-ink); text-underline-offset: 3px; }
+.links a { color: var(--pr-ink); text-underline-offset: 3px; }
 .diagram { overflow-x: auto; }
-svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: var(--font); }
+svg { display: block; width: 100%; min-width: 900px; height: auto; font-family: var(--font); }
 
-.n rect { stroke-width: 1.6; }
-.n .t { font-size: 16px; font-weight: 600; text-anchor: middle; }
-.n .s { font-size: 13px; text-anchor: middle; }
-.n .u { font-size: 12.5px; text-anchor: middle; }
-.core rect { fill: var(--core-fill); stroke: var(--core-line); } .core text { fill: var(--core-ink); }
-.ui rect   { fill: var(--ui-fill);   stroke: var(--ui-line); }   .ui text   { fill: var(--ui-ink); }
-.ext rect  { fill: var(--ext-fill);  stroke: var(--ext-line); }  .ext text  { fill: var(--ext-ink); }
-.lib rect  { fill: var(--lib-fill);  stroke: var(--lib-line); }  .lib text  { fill: var(--lib-ink); }
-.lib .u, .core .u { fill: var(--muted); }
-.core.inlib .u { fill: var(--core-ink); }
-
-.e { fill: none; stroke: var(--edge); stroke-width: 1.6; }
-.e.http { stroke-dasharray: 6 5; }
+.band rect { fill: var(--band); }
+.band text { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; fill: var(--muted); }
+.n rect { stroke-width: 1.8; }
+.n .t { font-size: 19px; font-weight: 650; }
+.n .s { font-size: 15px; }
+.in rect  { fill: var(--in-fill);  stroke: var(--in-line); }  .in text  { fill: var(--in-ink); }
+.pr rect  { fill: var(--pr-fill);  stroke: var(--pr-line); }  .pr text  { fill: var(--pr-ink); }
+.out rect { fill: var(--out-fill); stroke: var(--out-line); } .out text { fill: var(--out-ink); }
+.e { fill: none; stroke: var(--edge); stroke-width: 1.8; }
 .ah { fill: var(--edge); }
-.panel { fill: none; stroke: var(--lib-line); stroke-width: 1.5; stroke-dasharray: 7 6; }
-.panel-label { font-size: 16px; font-weight: 600; fill: var(--ink); }
-.note { font-size: 13px; fill: var(--muted); }
-.legend text { font-size: 14px; fill: var(--ink); }
+
+.value { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.value div { border: 1px solid color-mix(in srgb, var(--edge) 45%, transparent); border-radius: 12px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.value h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.value p { margin: 0; font-size: 15px; line-height: 1.5; }
+
 @media print {
-  @page { size: 1300px 935px; margin: 0; }
+  @page { size: 1300px 815px; margin: 0; }
   body { padding-block: 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   svg { min-width: 0; }
 }
@@ -69,194 +65,110 @@ svg { display: block; width: 100%; min-width: 980px; height: auto; font-family: 
 
 <div class="sheet">
   <header>
-    <h1>OTT Release Radar — component map</h1>
-    <p class="sub">Next.js 16 App Router · one screen + one API route · Vercel Cron · TMDB + RapidAPI · no database</p>
+    <h1>OTT Release Radar — how it works</h1>
+    <p class="sub">Every Friday evening, Naman gets one Telegram message listing what's new this week on Netflix, Prime Video and JioHotstar in India, filtered to his tastes, with an AI watch-or-skip call on each title.</p>
     <div class="links"><a href="https://ott-release-radar-theta.vercel.app">Live app</a><a href="https://github.com/sanjanapundir-ai/ott-release-radar">GitHub repository</a></div>
   </header>
 
   <div class="diagram">
-  <svg viewBox="0 110 1600 970" role="img" aria-label="Component map: layout.tsx renders page.tsx, which shows the profile, buttons, status and a list of digest entries and calls the digest API route. Vercel Cron also calls the route. The route uses lib/digest.ts, which uses tmdb.ts (with streaming.ts), gemini.ts and telegram.ts. These call Streaming Availability on RapidAPI, TMDB, Gemini Flash and the Telegram Bot API.">
+  <svg viewBox="0 0 1600 560" role="img" aria-label="Inputs: a weekly schedule, Naman's taste profile and live release data feed a find-and-filter step, then an AI curator using Gemini Flash. Outputs: a Friday Telegram digest and a website preview.">
     <defs>
       <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path class="ah" d="M0 0 L10 5 L0 10 z"/>
       </marker>
     </defs>
 
-    <!-- ===== UI tree (left) ===== -->
-    <g class="n core">
-      <rect x="380" y="130" width="320" height="68" rx="10"/>
-      <text class="t" x="540" y="158">app/layout.tsx</text>
-      <text class="s" x="540" y="182">fonts · &lt;html&gt; · page title</text>
-    </g>
-    <path class="e" d="M540 198 V238" marker-end="url(#ah)"/>
-
-    <g class="n core">
-      <rect x="290" y="240" width="500" height="92" rx="10"/>
-      <text class="t" x="540" y="270">app/page.tsx</text>
-      <text class="s" x="540" y="294">client component · owns state: loading · status · entries</text>
-      <text class="s" x="540" y="316">the only place in the UI that calls /api/digest</text>
+    <!-- Bands -->
+    <g class="band">
+      <rect x="20" y="10" width="500" height="540" rx="16"/>
+      <rect x="560" y="10" width="580" height="540" rx="16"/>
+      <rect x="1180" y="10" width="400" height="540" rx="16"/>
+      <text x="48" y="46">INPUTS</text>
+      <text x="588" y="46">PROCESS</text>
+      <text x="1208" y="46">OUTPUT</text>
     </g>
 
-    <path class="e" d="M540 332 V372 M150 372 H930"/>
-    <path class="e" d="M150 372 V410" marker-end="url(#ah)"/>
-    <path class="e" d="M410 372 V410" marker-end="url(#ah)"/>
-    <path class="e" d="M670 372 V410" marker-end="url(#ah)"/>
-    <path class="e" d="M930 372 V410" marker-end="url(#ah)"/>
-
-    <g class="n ui">
-      <rect x="50" y="412" width="200" height="74" rx="10"/>
-      <text class="t" x="150" y="442">ProfilePanel</text>
-      <text class="s" x="150" y="466">Naman · genres · schedule</text>
+    <!-- Inputs -->
+    <g class="n in">
+      <rect x="48" y="74" width="420" height="100" rx="12"/>
+      <text class="t" x="72" y="112">Weekly schedule</text>
+      <text class="s" x="72" y="142">Every Friday at 7 PM IST, or on demand</text>
     </g>
-    <g class="n ui">
-      <rect x="310" y="412" width="200" height="74" rx="10"/>
-      <text class="t" x="410" y="442">ActionButtons</text>
-      <text class="s" x="410" y="466">Preview · Send Now</text>
+    <g class="n in">
+      <rect x="48" y="200" width="420" height="140" rx="12"/>
+      <text class="t" x="72" y="238">Naman's taste profile</text>
+      <text class="s" x="72" y="268">Thriller · Sci-Fi · Indie Drama</text>
+      <text class="s" x="72" y="294">Hindi · English · Tamil</text>
+      <text class="s" x="72" y="320">Netflix · Prime Video · JioHotstar</text>
     </g>
-    <g class="n ui">
-      <rect x="570" y="412" width="200" height="74" rx="10"/>
-      <text class="t" x="670" y="442">StatusMessage</text>
-      <text class="s" x="670" y="466">progress · counts · errors</text>
-    </g>
-    <g class="n ui">
-      <rect x="830" y="412" width="200" height="74" rx="10"/>
-      <text class="t" x="930" y="442">DigestList</text>
-      <text class="s" x="930" y="466">sorted by match score</text>
+    <g class="n in">
+      <rect x="48" y="366" width="420" height="160" rx="12"/>
+      <text class="t" x="72" y="404">Live release data</text>
+      <text class="s" x="72" y="434">TMDB: what released in India</text>
+      <text class="s" x="72" y="460">Streaming Availability (RapidAPI):</text>
+      <text class="s" x="72" y="486">what landed on each platform</text>
+      <text class="s" x="72" y="512">this week</text>
     </g>
 
-    <text class="note" x="50" y="530">These four are sections of page.tsx</text>
-    <text class="note" x="50" y="550">(inline JSX, not separate files).</text>
+    <path class="e" d="M468 124 H520 V250" />
+    <path class="e" d="M468 270 H590" marker-end="url(#ah)"/>
+    <path class="e" d="M468 446 H520 V290" />
 
-    <path class="e" d="M930 486 V553" marker-end="url(#ah)"/>
-    <text class="note" x="942" y="524">one per title</text>
-
-    <g class="n ui">
-      <rect x="770" y="555" width="320" height="92" rx="10"/>
-      <text class="t" x="930" y="583">DigestEntry card</text>
-      <text class="s" x="930" y="605">title · platform · runtime · genre tags</text>
-      <text class="s" x="930" y="625">synopsis · WATCH / SKIP · reason · Open link</text>
+    <!-- Process -->
+    <g class="n pr">
+      <rect x="592" y="74" width="516" height="196" rx="12"/>
+      <text class="t" x="618" y="112">1. Find and filter</text>
+      <text class="s" x="618" y="144">Released in the last 7 days</text>
+      <text class="s" x="618" y="170">Recent titles only, no old catalogue</text>
+      <text class="s" x="618" y="196">Matches his genres and languages</text>
+      <text class="s" x="618" y="222">Series: new shows, or new seasons of</text>
+      <text class="s" x="618" y="246">shows that are still running</text>
     </g>
-
-    <!-- ===== Backend path (right) ===== -->
-    <g class="n core">
-      <rect x="1130" y="130" width="400" height="68" rx="10"/>
-      <text class="t" x="1330" y="158">vercel.json</text>
-      <text class="s" x="1330" y="182">cron 30 13 * * 5 · Friday 7:00 PM IST</text>
-    </g>
-    <path class="e" d="M1330 198 V238" marker-end="url(#ah)"/>
-    <text class="note" x="1342" y="224">Bearer CRON_SECRET</text>
-
-    <g class="n core">
-      <rect x="1080" y="240" width="500" height="92" rx="10"/>
-      <text class="t" x="1330" y="270">app/api/digest/route.ts</text>
-      <text class="s" x="1330" y="294">GET · auth: CRON_SECRET header or ?manual=true</text>
-      <text class="s" x="1330" y="316">?send=false returns preview JSON, skips Telegram</text>
+    <path class="e" d="M850 270 V310" marker-end="url(#ah)"/>
+    <g class="n pr">
+      <rect x="592" y="312" width="516" height="214" rx="12"/>
+      <text class="t" x="618" y="350">2. AI curator (Gemini Flash)</text>
+      <text class="s" x="618" y="382">Compares each title with his profile</text>
+      <text class="s" x="618" y="408">Uses critic rating, cast and director</text>
+      <text class="s" x="618" y="434">Gives WATCH or SKIP with a 0–100 score</text>
+      <text class="s" x="618" y="460">Writes a two-line synopsis and a</text>
+      <text class="s" x="618" y="484">one-line reason</text>
     </g>
 
-    <path class="e http" d="M790 286 H1078" marker-end="url(#ah)"/>
-    <text class="note" x="934" y="274" text-anchor="middle">fetch /api/digest</text>
-    <text class="note" x="934" y="306" text-anchor="middle">?manual=true · &amp;send=false to preview</text>
+    <path class="e" d="M1108 380 H1150 V176 H1206" marker-end="url(#ah)"/>
+    <path class="e" d="M1150 380 V438 H1206" marker-end="url(#ah)"/>
 
-    <path class="e" d="M1330 332 V660 H1425 V743" marker-end="url(#ah)"/>
-    <text class="note" x="1342" y="372">buildDigest() → sendDigest()</text>
-
-    <text class="note" x="1356" y="440">one run ≈ 30 s · function limit 120 s</text>
-    <text class="note" x="1356" y="464">Gemini down → digest still sends,</text>
-    <text class="note" x="1356" y="484">just without verdicts</text>
-    <text class="note" x="1356" y="512">no database: the profile lives</text>
-    <text class="note" x="1356" y="532">in preferences.ts</text>
-    <text class="note" x="1356" y="560">keys live in Vercel env vars</text>
-
-    <!-- ===== lib/ panel ===== -->
-    <rect class="panel" x="40" y="690" width="1520" height="210" rx="14"/>
-    <text class="panel-label" x="64" y="724">lib/ — pipeline logic, no UI (called by route.ts)</text>
-
-    <g class="n lib">
-      <rect x="60" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="175" y="775">preferences.ts</text>
-      <text class="s" x="175" y="802">languages hi · en · ta</text>
-      <text class="s" x="175" y="822">genre IDs · platform names</text>
-      <text class="u" x="175" y="852">← tmdb, streaming, gemini</text>
+    <!-- Output -->
+    <g class="n out">
+      <rect x="1208" y="74" width="344" height="222" rx="12"/>
+      <text class="t" x="1232" y="112">Friday Telegram digest</text>
+      <text class="s" x="1232" y="144">Up to 12 picks, best first</text>
+      <text class="s" x="1232" y="170">Platform · runtime · genres</text>
+      <text class="s" x="1232" y="196">Synopsis and verdict</text>
+      <text class="s" x="1232" y="222">Link to open it in the app</text>
+      <text class="s" x="1232" y="260">Delivered to Naman's chat</text>
     </g>
-    <g class="n lib">
-      <rect x="310" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="425" y="775">streaming.ts</text>
-      <text class="s" x="425" y="802">added to platform this week</text>
-      <text class="s" x="425" y="822">recent only · cached daily</text>
-      <text class="u" x="425" y="852">← tmdb.ts</text>
-    </g>
-    <g class="n lib">
-      <rect x="560" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="675" y="775">tmdb.ts</text>
-      <text class="s" x="675" y="802">merges both sources</text>
-      <text class="s" x="675" y="822">filters · pools 10 + 10</text>
-      <text class="u" x="675" y="852">← digest.ts</text>
-    </g>
-    <g class="n lib">
-      <rect x="810" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="925" y="775">gemini.ts</text>
-      <text class="s" x="925" y="802">batched JSON verdicts</text>
-      <text class="s" x="925" y="822">rating · cast · 15 s timeout</text>
-      <text class="u" x="925" y="852">← digest.ts</text>
-    </g>
-    <g class="n lib">
-      <rect x="1060" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="1175" y="775">telegram.ts</text>
-      <text class="s" x="1175" y="802">HTML · split under 4096</text>
-      <text class="s" x="1175" y="822">Open-in-app links</text>
-      <text class="u" x="1175" y="852">← digest.ts</text>
-    </g>
-    <g class="n core inlib">
-      <rect x="1310" y="745" width="230" height="128" rx="10"/>
-      <text class="t" x="1425" y="775">digest.ts</text>
-      <text class="s" x="1425" y="802">joins data + verdicts</text>
-      <text class="s" x="1425" y="822">top 12 by match score</text>
-      <text class="u" x="1425" y="852">← route.ts</text>
-    </g>
-
-    <!-- ===== External services ===== -->
-    <text class="note" x="64" y="960">external services</text>
-    <text class="note" x="64" y="980">(live data over HTTPS)</text>
-    <path class="e" d="M425 873 V928" marker-end="url(#ah)"/>
-    <g class="n ext">
-      <rect x="310" y="930" width="230" height="68" rx="10"/>
-      <text class="t" x="425" y="958">Streaming Availability</text>
-      <text class="s" x="425" y="982">RapidAPI · arrivals in India</text>
-    </g>
-    <path class="e" d="M675 873 V928" marker-end="url(#ah)"/>
-    <g class="n ext">
-      <rect x="560" y="930" width="230" height="68" rx="10"/>
-      <text class="t" x="675" y="958">TMDB API v3</text>
-      <text class="s" x="675" y="982">discover · providers · details</text>
-    </g>
-    <path class="e" d="M925 873 V928" marker-end="url(#ah)"/>
-    <g class="n ext">
-      <rect x="810" y="930" width="230" height="68" rx="10"/>
-      <text class="t" x="925" y="958">Gemini Flash</text>
-      <text class="s" x="925" y="982">flash-latest → 3.5 → lite</text>
-    </g>
-    <path class="e" d="M1175 873 V928" marker-end="url(#ah)"/>
-    <g class="n ext">
-      <rect x="1060" y="930" width="230" height="68" rx="10"/>
-      <text class="t" x="1175" y="958">Telegram Bot API</text>
-      <text class="s" x="1175" y="982">sendMessage → Naman’s chat</text>
-    </g>
-
-    <!-- ===== Legend ===== -->
-    <g class="legend">
-      <g class="n core"><rect x="56" y="1036" width="18" height="18" rx="4"/></g>
-      <text x="84" y="1050">app shell / core logic</text>
-      <g class="n ui"><rect x="290" y="1036" width="18" height="18" rx="4"/></g>
-      <text x="318" y="1050">UI sections of page.tsx</text>
-      <g class="n ext"><rect x="540" y="1036" width="18" height="18" rx="4"/></g>
-      <text x="568" y="1050">external service</text>
-      <g class="n lib"><rect x="740" y="1036" width="18" height="18" rx="4"/></g>
-      <text x="768" y="1050">helpers</text>
-      <path class="e" d="M880 1045 H940" marker-end="url(#ah)"/>
-      <text x="952" y="1050">renders / calls</text>
-      <path class="e http" d="M1110 1045 H1170" marker-end="url(#ah)"/>
-      <text x="1182" y="1050">HTTP request</text>
+    <g class="n out">
+      <rect x="1208" y="380" width="344" height="146" rx="12"/>
+      <text class="t" x="1232" y="418">Website preview</text>
+      <text class="s" x="1232" y="450">See this week's picks any time</text>
+      <text class="s" x="1232" y="476">or send the digest now</text>
     </g>
   </svg>
+  </div>
+
+  <div class="value">
+    <div>
+      <h2>Problem</h2>
+      <p>Naman spends 20 minutes every Friday scrolling three apps to find what's new, because the apps push trending titles instead.</p>
+    </div>
+    <div>
+      <h2>Outcome</h2>
+      <p>One message a week with only new titles that fit his taste, a clear watch-or-skip call on each, and a link straight into the app.</p>
+    </div>
+    <div>
+      <h2>Reliability and cost</h2>
+      <p>Runs on free plans. If one data source or AI model is down, the digest still goes out. API use is cached and capped so the monthly quota lasts.</p>
+    </div>
   </div>
 </div>
