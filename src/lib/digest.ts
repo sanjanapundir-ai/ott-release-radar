@@ -1,0 +1,40 @@
+import { fetchWeeklyNewReleases, type OTTMediaItem } from "./tmdb";
+import { getGeminiRecommendations, type Recommendation } from "./gemini";
+import { escapeHtml, sendTelegramDigest } from "./telegram";
+
+export interface DigestEntry extends OTTMediaItem {
+  recommendation?: Recommendation;
+}
+
+export async function buildDigest(): Promise<DigestEntry[]> {
+  const items = await fetchWeeklyNewReleases();
+  const recs = await getGeminiRecommendations(items);
+  return items
+    .map((item) => ({ ...item, recommendation: recs.get(item.key) }))
+    .sort((a, b) => (b.recommendation?.matchScore ?? 0) - (a.recommendation?.matchScore ?? 0));
+}
+
+function formatEntry(e: DigestEntry): string {
+  const r = e.recommendation;
+  const verdict = r ? (r.verdict === "WATCH" ? "✅ <b>WATCH</b>" : "⏭ <b>SKIP</b>") : "❔ <b>No verdict</b>";
+  const synopsis = r?.twoLineSynopsis ?? e.overview.slice(0, 160);
+  const lines = [
+    `🎬 <b>${escapeHtml(e.title)}</b> (${e.type === "movie" ? "Movie" : "Series"} · ${e.language.toUpperCase()})`,
+    `📺 ${escapeHtml(e.platforms.join(", "))} · ⏱ ${escapeHtml(e.runtimeOrEpisodes)}`,
+    `🏷 ${escapeHtml(e.genres.join(", ") || "—")}`,
+    `📝 ${escapeHtml(synopsis)}`,
+    `${verdict}${r ? ` (${r.matchScore}/100) — ${escapeHtml(r.reason)}` : ""}`,
+  ];
+  return lines.join("\n");
+}
+
+export async function sendDigest(entries: DigestEntry[]): Promise<number> {
+  const header = "🍿 <b>New This Week — OTT Release Radar (India)</b>";
+  if (entries.length === 0) {
+    return sendTelegramDigest([
+      header,
+      "No new releases matched your genres and languages in the last 7 days.",
+    ]);
+  }
+  return sendTelegramDigest([header, ...entries.map(formatEntry)]);
+}
