@@ -20,6 +20,7 @@ export interface OTTMediaItem {
   cast?: string[];
   directors?: string[];
   newSeason?: number;
+  ongoing?: boolean; // TV only: TMDB says the show is returning or in production
 }
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -85,7 +86,15 @@ interface Details {
   runtime?: number;
   number_of_episodes?: number;
   number_of_seasons?: number;
+  status?: string; // TV: "Returning Series", "In Production", "Planned", "Ended", "Canceled"
   seasons?: { season_number: number; air_date: string | null }[];
+}
+
+// A returning show's new season counts only while the show is still continuing;
+// seasons of ended or cancelled shows are dropped. Brand-new shows are always kept.
+const ONGOING_STATUSES = ["Returning Series", "In Production", "Planned"];
+function isOngoing(details: Details): boolean {
+  return ONGOING_STATUSES.includes(details.status ?? "");
 }
 
 interface Candidate {
@@ -178,12 +187,14 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
             ? details.seasons?.find((s) => s.season_number === c.arrival!.newSeason)
             : undefined;
           if (!isFresh(details.first_air_date) && !isFresh(season?.air_date)) return null;
+          if (!isFresh(details.first_air_date) && !isOngoing(details)) return null;
         }
       } else if (c.type === "tv") {
         // A TMDB-only show counts as new only if it premiered, or a new season started,
         // in the window, not because a weekly episode of a long-running show aired.
         const newSeason = details.seasons?.some((s) => s.season_number > 0 && inWindow(s.air_date));
         if (!inWindow(details.first_air_date) && !newSeason) return null;
+        if (!inWindow(details.first_air_date) && !isOngoing(details)) return null;
       }
 
       const platforms = c.arrival
@@ -225,6 +236,7 @@ export async function fetchWeeklyNewReleases(): Promise<OTTMediaItem[]> {
         cast: c.arrival?.cast,
         directors: c.arrival?.directors,
         newSeason: c.arrival?.newSeason,
+        ongoing: c.type === "tv" ? isOngoing(details) : undefined,
       };
       return { item, popularity: details.popularity };
     })

@@ -38,6 +38,7 @@ ${JSON.stringify(
     overview: i.overview,
     platforms: i.platforms,
     ...(i.newSeason ? { newSeason: i.newSeason } : {}),
+    ...(i.ongoing !== undefined ? { status: i.ongoing ? "ongoing series" : "new series" } : {}),
     ...(i.rating !== undefined ? { criticRating: `${i.rating}/100` } : {}),
     ...(i.directors?.length ? { directors: i.directors } : {}),
     ...(i.cast?.length ? { cast: i.cast } : {}),
