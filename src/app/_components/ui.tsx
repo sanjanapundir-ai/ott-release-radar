@@ -125,7 +125,11 @@ export function MediaCard({ entry, onOpen }: { entry: DigestEntry; onOpen: () =>
       <div className="mt-2 space-y-0.5 px-0.5">
         <h3 className="truncate text-sm font-semibold text-white">{entry.title}</h3>
         <p className="truncate text-xs text-zinc-400">{metaLine(entry)}</p>
+        {entry.genres.length > 0 && (
+          <p className="truncate text-xs text-zinc-500">{entry.genres.slice(0, 3).join(" · ")}</p>
+        )}
         {r?.moodTag && <p className="truncate text-xs text-red-300/90">{r.moodTag}</p>}
+        <p className="line-clamp-2 pt-1 text-xs leading-snug text-zinc-400">{r?.twoLineSynopsis ?? entry.overview}</p>
       </div>
     </button>
   );

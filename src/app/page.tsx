@@ -8,6 +8,7 @@ import { Hero, HeroSkeleton } from "./_components/hero";
 import { DetailSheet } from "./_components/detail";
 import { ProfileEditor, type ProfileOptions } from "./_components/profile";
 import { MediaCard, SkeletonCard } from "./_components/ui";
+import { About } from "./_components/about";
 
 type Tab = "week" | "watchlist" | "profile";
 type Filter = "all" | "watch" | "skip" | "movie" | "tv";
@@ -278,6 +279,8 @@ export default function Home() {
                 )}
               </div>
             </section>
+
+            <About />
           </>
         )}
 
